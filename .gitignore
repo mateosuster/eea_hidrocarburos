@@ -39,4 +39,4 @@ vignettes/*.pdf
 .Renviron
 
 
-/prod_capiv
+**/prod_capiv

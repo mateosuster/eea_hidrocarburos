@@ -7,7 +7,7 @@ library(lubridate)
 
 
 #pozos
-pozos = read_csv("repos/pioYPFConicet/analisis/data/secretaria_energia/cap_iv/listado-de-pozos-cargados-por-empresas-operadoras.csv")
+pozos = read_csv("data/listado-de-pozos-cargados-por-empresas-operadoras.csv")
 glimpse(pozos)
 
 table(pozos$formprod )
