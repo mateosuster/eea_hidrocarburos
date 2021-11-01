@@ -13,7 +13,7 @@ glimpse(pozos)
 table(pozos$formprod )
 
 #produccion 
-prod_18  = read_csv("datos/oil and gas/Cap 4/Data prod/produccin-de-pozos-de-gas-y-petrleo-2018.csv")
+prod_18  = read_csv("data/prod_capiv/produccin-de-pozos-de-gas-y-petrleo-2018.csv")
 glimpse(prod_18)
 
 unique(prod_18$cuenca)
@@ -57,7 +57,7 @@ summary(model)
 
 
 #inversiones
-inversiones = read_csv("repos/pioYPFConicet/analisis/data/secretaria_energia/2057/resolucin-2057-inversiones-realizadas-ao-anterior.csv", 
+inversiones = read_csv("data/resolucin-2057-inversiones-realizadas-ao-anterior.csv", 
                      col_types = cols(`Fecha Fin Tareas` = col_date(format = "%d/%m/%Y"), 
                                       `Fecha Inicio Tareas` = col_date(format = "%d/%m/%Y"))) %>% 
   rename(anio = "Año de presentación de la DDJJ",
@@ -85,7 +85,8 @@ summary(inversiones)
 
 
 # precio
-precio_gas = read_delim("repos/pioYPFConicet/analisis/data/secretaria_energia/regalias/precio_mercado_interno_gas_regalias.csv",                        delim = ";") %>% 
+precio_gas = read_delim("data/precio_mercado_interno_gas_regalias.csv",   
+                        delim = ";") %>% 
   rename(anio = "AÑO", mes = "MES") %>% 
   mutate(unidad_gas = "ARS/Mm3",         
          anio =zoo::na.locf(anio),
@@ -107,7 +108,7 @@ precio_gas = read_delim("repos/pioYPFConicet/analisis/data/secretaria_energia/re
                         cuenca ==  "TOTAL CUENCA"~ "OTRA" )) %>% 
   select(-fecha)
   
-precio_crudo = read_delim("repos/pioYPFConicet/analisis/data/secretaria_energia/regalias/precio_mercado_interno_crudo_cuenca_2.csv",
+precio_crudo = read_delim("data/precio_mercado_interno_crudo_cuenca.csv",
                           delim = ";") %>% 
   rename(anio = "AÑO", mes = "MES") %>% 
   mutate(unidad_crudo = "USD/m3",         
