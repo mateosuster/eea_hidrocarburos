@@ -1,4 +1,0 @@
----
-title: "Visualizaciones"
-output: html_notebook
----
