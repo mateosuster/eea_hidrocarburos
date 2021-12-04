@@ -1,5 +1,6 @@
 **/prod_capiv
 data/resultados/data_2013_2020.csv
+data/resultados/dataset_2013a2020.csv
 
 # History files
 .Rhistory
