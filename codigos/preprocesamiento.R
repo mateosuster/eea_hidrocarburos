@@ -10,19 +10,30 @@ library(modeest)
 ######################
 # Parámetros dataset producción
 #####################
-anio_desde = 2010
-anio_hasta = 2011
+anio_desde = 2013
+anio_hasta = 2020
 
-group_cols = c( "anio", "mes", 
+# chequar la coherencia del agrupamiento de produccion e inversión (los precios SOLO estan por cuenca)
+group_cols_prod = c( "anio", "mes", 
                 "cuenca", "areayacimiento" , "areapermisoconcesion",
+                "clasificacion",
                 "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
                 "proyecto")
+
+group_cols_inv = c("anio", "cuenca","area_per_conc", "concepto")
+
+name_dataset_export = "data_2013_2020.csv" # ir cambiando segun lo que se quiera probar
+
+#NOTA: ajustar el join a manopla
+
+#UNIDADES en las que terminan las vars
+# PRODUCCION: crudo m3, gas Miles de m3, agua m3
+# PRECIOS: crudo m3/USD, gas Miles de m3/USD (TC BNA comprador)
+# INVERSIONES: Millones de USD
 
 #################
 #PRODUCCION 
 ################
-#crudo m3, gas Miles de m3, agua m3
-
 # lista de archivos 
 file_list = list.files(path ="data/prod_capiv/" , pattern="*.csv")
 data_list <- list()
@@ -35,7 +46,8 @@ for (i in seq_along(file_list)) {
   # Guardo DF en la lista
   if (anio %in% seq(anio_desde, anio_hasta)){
     # Read data in
-    df <- read.csv(paste0("data/prod_capiv/", filename) )
+    df <- read_csv(paste0("data/prod_capiv/", filename),
+                   locale = locale())
     
     name = paste0("data_", anio )
     data_list[[name]] <- df
@@ -58,7 +70,7 @@ for (i in names(data_list)){
                                                     "ÑIRIHUAU" , NA  ) ~ "OTRA",
                                      T ~cuenca)) %>% 
            mutate(idareapermisoconcesion = as.double(idareapermisoconcesion)) %>%
-           group_by_at(group_cols ) %>% 
+           group_by_at(group_cols_prod ) %>% 
            summarise(prod_pet = sum(prod_pet, na.rm = T), 
                      prod_gas = sum(prod_gas, na.rm = T),
                      prod_agua = sum(prod_agua, na.rm = T),
@@ -75,15 +87,14 @@ for (i in names(data_list)){
 dfs = sapply(.GlobalEnv, is.data.frame) 
 super_data = do.call(rbind, mget(names(dfs)[dfs]))
 rm(list=ls(pattern="^data_"))
-
-str(super_data)
+gc()
+glimpse(super_data)
 
 # PRODUCCION  2018 (sirve de prueba)
 # prod  = read_csv("data/prod_capiv/produccin-de-pozos-de-gas-y-petrleo-2018.csv")
 # glimpse(prod)
-# 
-# 
 # unique(prod$cuenca)
+# unique(prod$formacion)
 # table(prod$proyecto     )
 # table(prod$clasificacion )
 # table(prod$tipo_de_recurso )
@@ -91,21 +102,19 @@ str(super_data)
 # table(prod$tipoextraccion )
 # table(prod$tipoestado)
 # table(prod$tipopozo)
-# 
-# unique(prod$formacion)
-# 
+
+ 
 # #producción por area de pozos en explotación
-# prod_area = prod %>% 
-#   filter(clasificacion == "EXPLOTACION" ) %>% 
-#   mutate(cuenca = case_when(cuenca %in% c( "TOTAL CUENCA" ,"CAÑADON ASFALTO", 
+# prod_area = prod %>%
+#   filter(clasificacion == "EXPLOTACION" ) %>%
+#   mutate(cuenca = case_when(cuenca %in% c( "TOTAL CUENCA" ,"CAÑADON ASFALTO",
 #                                            "ÑIRIHUAU" , NA  ) ~ "OTRA",
-#                             T ~cuenca)) %>% 
-#   # mutate(idareapermisoconcesion = as.double(idareapermisoconcesion)) %>% 
-#   # group_by(anio, mes, cuenca ,areayacimiento,  areapermisoconcesion ) %>% 
-#   group_by_at(c( "areayacimiento", "anio", "mes" ) ) %>% #, empresa, idempresa
-#   summarise(prod_pet = sum(prod_pet, na.rm = T), 
+#                             T ~cuenca)) %>%
+#   mutate(idareapermisoconcesion = as.double(idareapermisoconcesion)) %>%
+#   group_by_at( group_cols_prod  ) %>% #, empresa, idempresa
+#   summarise(prod_pet = sum(prod_pet, na.rm = T),
 #             prod_gas = sum(prod_gas, na.rm = T),
-#             prod_agua = sum(prod_agua, na.rm = T)) 
+#             prod_agua = sum(prod_agua, na.rm = T))
 # glimpse(prod_area)
 
 
@@ -135,14 +144,12 @@ inversiones = read_csv("data/resolucin-2057-inversiones-realizadas-ao-anterior.c
   #        area_per_conc, yacimiento, cuenca, 
   #        cantidad_exploracion, cantidad_explotacion,cantidad_exploracion_complementaria,
          # exploracion_millones_usd,explotacion_millones_usd, exploracion_compl_millones_usd )%>%
-  filter(anio == 2018 ) %>% 
   # group_by(cuenca, area_per_conc) %>%
-  group_by(anio, cuenca, concepto) %>% #empresa, idempresa
+  group_by_at(group_cols_inv) %>% #empresa, idempresa
   summarise(inversion_explotacion = sum(explotacion_millones_usd, na.rm = T),
             inversion_exploracion = sum(exploracion_millones_usd, na.rm = T))
 
 glimpse(inversiones)
-summary(inversiones)
 
 ###################
 # tc bna
@@ -208,7 +215,6 @@ precio_crudo = read_delim("data/precio_mercado_interno_crudo_cuenca.csv",
     cuenca ==  "TOTAL CUENCA"~ "OTRA" )) %>%
   group_by(mes, anio, unidad_crudo, cuenca) %>% 
   summarise(precio_interno_crudo = mean(precio_interno_crudo, na.rm = T)) 
-glimpse(precio_crudo)  
 
 ##################
 #precios futuros
@@ -239,22 +245,24 @@ riesgo_pais <- read_excel("data/Serie_Historica_Spread_del_EMBI.xlsx",
 # join inversiones / produccion  / precios mdo int / riesgo país
 ##################
 #revisión de missings  
-sum(is.na(prod_area$areapermisoconcesion))
-sum(is.na(prod_area$areayacimiento))
-sum(is.na(inversiones$area_per_conc))
-sum(is.na(inversiones$Yacimiento))
+# sum(is.na(prod_area$areapermisoconcesion))
+# sum(is.na(prod_area$areayacimiento))
+# sum(is.na(inversiones$area_per_conc))
+# sum(is.na(inversiones$Yacimiento))
 
 
 #join de bases
 join =super_data  %>%
+# join =prod_area  %>%
   left_join(inversiones, by = c(
                               # "areayacimiento" = "yacimiento" , 
-                              # "areapermisoconcesion" = "area_per_conc" , 
+                              "areapermisoconcesion" = "area_per_conc" ,
                                 "cuenca" = "cuenca", 
                                 "anio" = "anio")) %>% 
   left_join(precio_crudo, by =c("cuenca" = "cuenca", "mes" = "mes", "anio" = "anio") ) %>%  
   left_join(precio_gas, by =c("cuenca" = "cuenca", "mes" = "mes", "anio" = "anio") ) %>% 
-  left_join(riesgo_pais, by = c("anio", "mes"))
+  left_join(riesgo_pais, by = c("anio", "mes")) %>% 
+  select(-c(unidad_gas, unidad_crudo))
 glimpse(join)
   
 
@@ -275,7 +283,7 @@ glimpse(join)
 #####################
 # Exportacion
 #####################
-write.csv(join , "data/resultados/dataset.csv")
+write.csv(join , paste0("data/resultados/", name_dataset_export))
 
 
         
