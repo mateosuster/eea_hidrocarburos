@@ -8,7 +8,7 @@ library(readxl)
 library(modeest)
 
 ######################
-# Parámetros
+# Parámetros dataset producción
 #####################
 anio_desde = 2010
 anio_hasta = 2011
@@ -257,20 +257,20 @@ join =super_data  %>%
   left_join(riesgo_pais, by = c("anio", "mes"))
 glimpse(join)
   
-join[is.na(join$explotacion_millones_usd),]  
-  # right_join(prod_area, by = c("yacimiento" ="areayacimiento" ))  
-    # right_join(prod_area, by = c("area_per_conc" ="areapermisoconcesion" , "cuenca" = "cuenca")) %>% 
+
+# right_join(prod_area, by = c("yacimiento" ="areayacimiento" ))  
+# right_join(prod_area, by = c("area_per_conc" ="areapermisoconcesion" , "cuenca" = "cuenca")) %>% 
     
 
-unique(prod$cuenca)    
+# unique(prod$cuenca)    
 
 #revisión de na's
-sum(is.na(join$explotacion_millones_usd ))
+# sum(is.na(join$explotacion_millones_usd ))
 # sum(is.na(join$area_per_conc ))
-sum(is.na(join$areapermisoconcesion ))
+# sum(is.na(join$areapermisoconcesion ))
 
-unique(join$areapermisoconcesion)
-glimpse(join)
+# unique(join$areapermisoconcesion)
+# glimpse(join)
 
 #####################
 # Exportacion
