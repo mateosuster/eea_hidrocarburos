@@ -7,6 +7,11 @@ library(lubridate)
 library(readxl)
 library(modeest)
 
+
+### CAMBIAR según PC
+setwd("~/dataScience/maestriaDC/2021/EEA_2021cuat2/practica/tp_final/eea_hidrocarburos")
+
+
 ######################
 # Parámetros dataset producción
 #####################
@@ -22,7 +27,7 @@ group_cols_prod = c( "anio", "mes",
 
 group_cols_inv = c("anio", "cuenca","area_per_conc", "concepto")
 
-name_dataset_export = "data_2013_2020.csv" # ir cambiando segun lo que se quiera probar
+name_dataset_export = "dataset_2013a2020.csv" # ir cambiando segun lo que se quiera probar
 
 #NOTA: ajustar el join a manopla
 
