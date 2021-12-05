@@ -258,7 +258,8 @@ data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
 ```
 
 
-# Descomposición de la serie temporal
+# STL (Descomposición de la serie temporal)
+## Default
 ```{r}
 dcmp_crudo = prod_tot %>% 
   model(stl = STL(prod_pet)) %>% 
@@ -296,7 +297,7 @@ dcmp_gas %>%
 dcmp_gas %>% autoplot()
 
 ```
-## Moving average
+### Moving average
 ```{r}
 prod_tot %>%
  mutate(
@@ -308,7 +309,7 @@ prod_tot %>%
        title = "Produccion crudo") +
   guides(colour = guide_legend(title = "series"))
 ```
-# STL
+## Smooth STL
 ```{r}
 prod_tot %>%
   model(
@@ -326,5 +327,10 @@ prod_tot %>%
     robust = TRUE)) %>%
   components() %>%
   autoplot()
+```
+# Prophet
+```{r}
+library(prophet)
+
 ```
 
