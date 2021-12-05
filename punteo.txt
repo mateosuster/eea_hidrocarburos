@@ -1,0 +1,18 @@
+
+VIDEO EEA
+
+1. Introducción
+1.1. Problema a resolver ( objetivos, hipótesis, etc)
+1.2. Datos (variables, etc)
+
+
+2. Modelos/metodología
+2.1. Time series descomposition
+2.1.1 Default
+2.1.2 Smooth
+2.2 Procesos gausianos
+
+3. Implementaciones
+
+4. Conclusión
+

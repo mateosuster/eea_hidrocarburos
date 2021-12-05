@@ -287,15 +287,16 @@ dcmp_gas %>%
   as_tsibble() %>%
   autoplot(prod_gas, colour="gray") +
   geom_line(aes(y=trend), colour = "#D55E00") +
+  geom_line(aes(y=season_adjust), colour = "#0072B2") +
   labs(
     y = "Mm3/día",
     title = "Producción de gas"
   )
 
-dcmp_crudo %>% autoplot()
+dcmp_gas %>% autoplot()
 
 ```
-
+## Moving average
 ```{r}
 prod_tot %>%
  mutate(
@@ -306,5 +307,24 @@ prod_tot %>%
   labs(y = "m3/dia",
        title = "Produccion crudo") +
   guides(colour = guide_legend(title = "series"))
+```
+# STL
+```{r}
+prod_tot %>%
+  model(
+    STL(prod_pet ~ trend(window = 7) +
+                   season(window = "periodic"),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+
+prod_tot %>%
+  model(
+    STL(prod_gas ~ trend(window = 12) +
+                   # season(window = "periodic"),
+                   season(window = 13),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
 ```
 
