@@ -1,0 +1,245 @@
+---
+title: "EDA - Visualizaciones"
+output: html_notebook
+---
+
+# Introducción
+```{r}
+rm(list=ls())
+gc()
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(tsibble)
+library(feasts)
+
+# agrupamientos
+group_cols_prod = c( "anio", "mes", 
+                "cuenca", "areayacimiento" , "areapermisoconcesion",
+                "clasificacion", "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
+                "proyecto",
+                "concepto")
+
+# función de agregacion
+agregacion <- function(x) {
+  x %>% 
+    summarise(prod_pet = sum(prod_pet, na.rm = T),
+           prod_gas = sum(prod_gas, na.rm = T),
+           prod_agua = sum(prod_agua, na.rm = T),
+           tef_avg = mean(tef_avg, na.rm = T),
+           vida_util_avg = mean(vida_util_avg, na.rm = T),
+           inversion_explotacion = sum(inversion_explotacion, na.rm = T),
+           inversion_exploracion = sum(inversion_exploracion, na.rm = T),
+           precio_interno_crudo = mean(precio_interno_crudo, na.rm = T),
+           precio_interno_gas = mean(precio_interno_gas, na.rm = T),
+           riesgo_pais = mean(riesgo_pais, na.rm = T)
+            )
+}
+
+```
+
+# Datos
+```{r}
+
+#datos originales
+data <- read_csv("../data/resultados/dataset_2013a2020.csv", 
+    locale = locale(encoding = "ISO-8859-1")) %>%
+  filter(anio %in% c(2016:2019)) %>%                     # filtro años para mayor velocidad
+  mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
+         n_dias = days_in_month(fecha),
+         prod_pet = prod_pet/n_dias,
+         prod_gas = prod_gas/n_dias,
+         prod_agua = prod_agua/n_dias) %>%           # CONVERSION A UNIDADES DIARIAS
+  select(-n_dias)
+  # group_by_at(group_cols_prod ) %>% 
+  # agregacion()
+
+# todos los datos agrupados por el vector de agrupamiento
+data_time = data %>%
+  as_tsibble(index = fecha, 
+             key =  all_of(group_cols_prod))
+
+# agregados por cuenca
+data_cuenca_time = data %>% 
+  group_by(fecha, cuenca ) %>%
+  agregacion() %>% 
+  as_tsibble(index = fecha, 
+             key =  cuenca)
+
+rm(data)
+gc()
+
+# agregacion totales por mes
+prod_tot = data_time %>% 
+  agregacion()
+
+
+
+```
+
+# EDA
+## Producción
+```{r}
+# TOTAL
+autoplot(prod_tot, prod_pet)+
+  labs(title = "Producción de petróleo crudo",
+       subtitle = "Argentina",
+       y = "m3")
+
+autoplot(prod_tot, prod_gas)+
+  labs(title = "Producción de gas natural",
+       subtitle = "Argentina",
+       y = "Mm3")
+
+# CUENCA
+autoplot(data_cuenca_time, prod_pet)+
+  labs(title = "Producción de petróleo crudo",
+       subtitle = "Argentina",
+       y = "m3")
+
+autoplot(data_cuenca_time, prod_gas)+
+  labs(title = "Producción de gas natural",
+       subtitle = "Argentina",
+       y = "Mm3")
+
+
+```
+
+## Inversión
+```{r}
+# TOTAL
+autoplot(prod_tot, inversion_explotacion)+
+  labs(title = "Inversión",
+       subtitle = "Argentina",
+       y = "MM USD")
+
+# CUENCA
+autoplot(data_cuenca_time, inversion_explotacion)+
+  labs(title = "Inversión",
+       subtitle = "Argentina",
+       y = "MM USD")
+
+```
+## Precios
+```{r}
+# TOTAL
+autoplot(prod_tot, precio_interno_crudo)+
+  labs(title = "Precios crudo",
+       subtitle = "Argentina",
+       y = "USD/m3")
+
+autoplot(prod_tot, precio_interno_gas)+
+  labs(title = "Precios gas",
+       subtitle = "Argentina",
+       y = "USD/Mm3")
+
+
+
+# CUENCA
+autoplot(data_cuenca_time, precio_interno_crudo)+
+  labs(title = "Precio crudo",
+       subtitle = "Argentina",
+       y = "USD/m3")
+
+autoplot(data_cuenca_time, precio_interno_gas)+
+  labs(title = "Precio gas",
+       subtitle = "Argentina",
+       y = "USD/Mm3")
+
+```
+
+
+# Estacionalidad
+## Producción
+```{r}
+#TOTAL
+prod_tot %>%
+  gg_season(prod_pet, labels = "both") +
+  labs(y = "m3",
+       title = "Seasonal plot: oil production")
+
+prod_tot %>%
+  gg_season(prod_gas, labels = "both") +
+  labs(y = "Mm3",
+       title = "Seasonal plot: natural gas production")
+
+prod_tot %>% 
+  gg_subseries(prod_pet) +
+  labs(y = "m3",
+       title = "Producción de crudo")
+
+prod_tot %>% 
+  gg_subseries(prod_gas) +
+  labs(y = "Mm3",
+       title = "Producción de gas")
+
+#CUENC
+data_cuenca_time %>%
+  gg_season(prod_pet, labels = "both") +
+  labs(y = "m3",
+       title = "Seasonal plot: oil production")
+
+data_cuenca_time %>%
+  gg_season(prod_gas, labels = "both") +
+  labs(y = "Mm3",
+       title = "Seasonal plot: natural gas production")
+
+
+```
+
+## Precios
+```{r}
+#TOTAL
+prod_tot %>%
+  gg_season(precio_interno_crudo, labels = "both") +
+  labs(y = "USD/m3",
+       title = "Seasonal plot: oil price")
+
+prod_tot %>%
+  gg_season(precio_interno_gas, labels = "both") +
+  labs(y = "USD/Mm3",
+       title = "Seasonal plot: natural gas price")
+
+prod_tot %>% 
+  gg_subseries(precio_interno_crudo) +
+  labs(y = "USD/m3",
+       title = "Precio de crudo")
+
+prod_tot %>% 
+  gg_subseries(precio_interno_gas) +
+  labs(y = "USD/Mm3",
+       title = "Precio de gas")
+
+#CUENC
+data_cuenca_time %>%
+  gg_season(precio_interno_crudo, labels = "both") +
+  labs(y = "USD/m3",
+       title = "Seasonal plot: oil price")
+
+data_cuenca_time %>%
+  gg_season(precio_interno_gas, labels = "both") +
+  labs(y = "USD/Mm3",
+       title = "Seasonal plot: natural gas price")
+
+
+```
+
+# Lag plot
+```{r}
+prod_tot %>% 
+  # filter(year(fecha)==2017) %>% 
+  gg_lag(prod_pet, geom = "point")
+```
+# Autocorrelación
+```{r}
+prod_tot %>% ACF(prod_pet) %>%   autoplot()
+data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
+```
+
+
+```{r}
+
+```
+

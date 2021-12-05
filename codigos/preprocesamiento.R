@@ -10,6 +10,7 @@ library(modeest)
 
 ### CAMBIAR según PC
 setwd("~/dataScience/maestriaDC/2021/EEA_2021cuat2/practica/tp_final/eea_hidrocarburos")
+setwd("C:/Archivos/repos/eea_hidrocarburos")
 
 
 ######################
