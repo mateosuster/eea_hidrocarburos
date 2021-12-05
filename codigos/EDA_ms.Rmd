@@ -57,23 +57,42 @@ data <- read_csv("../data/resultados/dataset_2013a2020.csv",
   # agregacion()
 
 # todos los datos agrupados por el vector de agrupamiento
-data_time = data %>%
+data_time = data %>%      #SOLO SIRVE PARA DATOS DE PRODUCCION
   as_tsibble(index = fecha, 
              key =  all_of(group_cols_prod))
 
 # agregados por cuenca
 data_cuenca_time = data %>% 
+  distinct(fecha, cuenca,areayacimiento, areapermisoconcesion, .keep_all = T ) %>%
   group_by(fecha, cuenca ) %>%
   agregacion() %>% 
   as_tsibble(index = fecha, 
              key =  cuenca)
 
-rm(data)
+# PARA INVERSION
+inv_cuenca = data %>% 
+  distinct(anio, concepto, cuenca,areayacimiento, areapermisoconcesion, .keep_all = T ) %>% 
+  group_by(anio, cuenca) %>% 
+  agregacion() %>% 
+  as_tsibble(index = anio, 
+             key =  all_of(c("cuenca")))
+
+inv_tot = data %>%
+  distinct(anio, concepto,  areapermisoconcesion, .keep_all = T ) %>%
+  group_by(anio) %>%
+  agregacion() %>%
+  as_tsibble(index = anio)
+
+  
+  
+# rm(data)
 gc()
 
 # agregacion totales por mes
-prod_tot = data_time %>% 
+prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
   agregacion()
+
+
 
 
 
@@ -97,7 +116,7 @@ autoplot(prod_tot, prod_gas)+
 autoplot(data_cuenca_time, prod_pet)+
   labs(title = "Producción de petróleo crudo",
        subtitle = "Argentina",
-       y = "m3")
+       y = "m3")+theme(legend.position = "bottom")
 
 autoplot(data_cuenca_time, prod_gas)+
   labs(title = "Producción de gas natural",
@@ -110,13 +129,13 @@ autoplot(data_cuenca_time, prod_gas)+
 ## Inversión
 ```{r}
 # TOTAL
-autoplot(prod_tot, inversion_explotacion)+
+autoplot(inv_tot, inversion_explotacion)+
   labs(title = "Inversión",
        subtitle = "Argentina",
        y = "MM USD")
 
 # CUENCA
-autoplot(data_cuenca_time, inversion_explotacion)+
+autoplot(inv_cuenca, inversion_explotacion)+
   labs(title = "Inversión",
        subtitle = "Argentina",
        y = "MM USD")
@@ -239,7 +258,53 @@ data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
 ```
 
 
+# Descomposición de la serie temporal
 ```{r}
+dcmp_crudo = prod_tot %>% 
+  model(stl = STL(prod_pet)) %>% 
+  components()
 
+dcmp_crudo %>%
+  as_tsibble() %>%
+  autoplot(prod_pet, colour="gray") +
+  geom_line(aes(y=trend), colour = "#D55E00") +
+  geom_line(aes(y=season_adjust), colour = "#0072B2") +
+  labs(
+    y = "m3/día",
+    title = "Producción de crudo"
+  )
+
+dcmp_crudo %>% autoplot()
+
+```
+
+```{r}
+dcmp_gas = prod_tot %>% 
+  model(stl = STL(prod_gas)) %>% 
+  components()
+
+dcmp_gas %>%
+  as_tsibble() %>%
+  autoplot(prod_gas, colour="gray") +
+  geom_line(aes(y=trend), colour = "#D55E00") +
+  labs(
+    y = "Mm3/día",
+    title = "Producción de gas"
+  )
+
+dcmp_crudo %>% autoplot()
+
+```
+
+```{r}
+prod_tot %>%
+ mutate(
+    `5-MA` = slider::slide_dbl(prod_pet, mean,
+                .before = 2, .after = 2, .complete = TRUE) ) %>% 
+  autoplot(prod_pet) +
+  geom_line(aes(y = `5-MA`), colour = "#D55E00") +
+  labs(y = "m3/dia",
+       title = "Produccion crudo") +
+  guides(colour = guide_legend(title = "series"))
 ```
 

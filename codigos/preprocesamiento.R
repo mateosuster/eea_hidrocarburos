@@ -21,12 +21,15 @@ anio_hasta = 2020
 
 # chequar la coherencia del agrupamiento de produccion e inversión (los precios SOLO estan por cuenca)
 group_cols_prod = c( "anio", "mes", 
-                "cuenca", "areayacimiento" , "areapermisoconcesion",
+                "cuenca", 
+                "areayacimiento" , "areapermisoconcesion",
                 "clasificacion",
                 "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
                 "proyecto")
 
-group_cols_inv = c("anio", "cuenca","area_per_conc", "concepto")
+group_cols_inv = c("anio", "cuenca",
+                   "area_per_conc", "concepto"
+                   )
 
 name_dataset_export = "dataset_2013a2020.csv" # ir cambiando segun lo que se quiera probar
 
@@ -151,11 +154,27 @@ inversiones = read_csv("data/resolucin-2057-inversiones-realizadas-ao-anterior.c
   #        cantidad_exploracion, cantidad_explotacion,cantidad_exploracion_complementaria,
          # exploracion_millones_usd,explotacion_millones_usd, exploracion_compl_millones_usd )%>%
   # group_by(cuenca, area_per_conc) %>%
+  mutate(anio = anio-1) %>% 
   group_by_at(group_cols_inv) %>% #empresa, idempresa
   summarise(inversion_explotacion = sum(explotacion_millones_usd, na.rm = T),
             inversion_exploracion = sum(exploracion_millones_usd, na.rm = T))
 
+#exploracion de inversiones
 glimpse(inversiones)
+unique(inversiones$concepto)
+inv_tot = inversiones %>% 
+  # group_by(anio, concepto) %>%
+  group_by(anio) %>%
+  summarise(inv_tot = sum(inversion_explotacion)) %>% 
+  arrange(-inv_tot)
+
+inv_cuenca = inversiones %>% 
+  group_by(anio, concepto) %>%
+  summarise(inv_tot = sum(inversion_explotacion)) %>% 
+  arrange(-inv_tot)
+
+write.csv(inv_tot, file = "data/resultados/inversion_total.csv")
+write.csv(inv_cuenca, file = "data/resultados/inversion_cuenca.csv")
 
 ###################
 # tc bna
@@ -289,7 +308,7 @@ glimpse(join)
 #####################
 # Exportacion
 #####################
-write.csv(join , paste0("data/resultados/", name_dataset_export))
+write.csv(join , paste0("data/resultados/", name_dataset_export),row.names = F)
 
 
         
