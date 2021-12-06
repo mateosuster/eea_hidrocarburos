@@ -14,6 +14,8 @@ library(ggplot2)
 library(lubridate)
 library(tsibble)
 library(feasts)
+library(prophet)
+
 
 # agrupamientos
 group_cols_prod = c( "anio", "mes", 
@@ -71,7 +73,7 @@ data_cuenca_time = data %>%
 
 # PARA INVERSION
 inv_cuenca = data %>% 
-  distinct(anio, concepto, cuenca,areayacimiento, areapermisoconcesion, .keep_all = T ) %>% 
+  distinct(anio, concepto, cuenca, areapermisoconcesion, .keep_all = T ) %>% 
   group_by(anio, cuenca) %>% 
   agregacion() %>% 
   as_tsibble(index = anio, 
@@ -83,6 +85,19 @@ inv_tot = data %>%
   agregacion() %>%
   as_tsibble(index = anio)
 
+# PARA PRECIOS
+precios_cuenca = data %>% 
+  distinct(fecha, cuenca, .keep_all = T ) %>% 
+  group_by(fecha, cuenca) %>% 
+  agregacion() %>% 
+  as_tsibble(index = fecha, 
+             key =  all_of(c("cuenca")))
+
+precios_tot = data %>%
+  distinct(fecha, cuenca, .keep_all = T ) %>%
+  group_by(fecha) %>%
+  agregacion() %>%
+  as_tsibble(index = fecha)
   
   
 # rm(data)
@@ -125,6 +140,14 @@ autoplot(data_cuenca_time, prod_gas)+
 
 
 ```
+### Con suavizado
+```{r}
+ggplot(prod_tot, aes(fecha, prod_pet)) + geom_point(color='forestgreen') + geom_smooth() + theme_bw() + labs(title='Producción de petróleo: Suavizado')
+
+ggplot(prod_tot, aes(fecha, prod_gas)) + geom_point(color='forestgreen') + geom_smooth() + theme_bw() + labs(title='Producción de gas: Suavizado')
+
+```
+
 
 ## Inversión
 ```{r}
@@ -144,12 +167,12 @@ autoplot(inv_cuenca, inversion_explotacion)+
 ## Precios
 ```{r}
 # TOTAL
-autoplot(prod_tot, precio_interno_crudo)+
+autoplot(precios_tot, precio_interno_crudo)+
   labs(title = "Precios crudo",
        subtitle = "Argentina",
        y = "USD/m3")
 
-autoplot(prod_tot, precio_interno_gas)+
+autoplot(precios_tot, precio_interno_gas)+
   labs(title = "Precios gas",
        subtitle = "Argentina",
        y = "USD/Mm3")
@@ -157,12 +180,12 @@ autoplot(prod_tot, precio_interno_gas)+
 
 
 # CUENCA
-autoplot(data_cuenca_time, precio_interno_crudo)+
+autoplot(precios_cuenca, precio_interno_crudo)+
   labs(title = "Precio crudo",
        subtitle = "Argentina",
        y = "USD/m3")
 
-autoplot(data_cuenca_time, precio_interno_gas)+
+autoplot(precios_cuenca, precio_interno_gas)+
   labs(title = "Precio gas",
        subtitle = "Argentina",
        y = "USD/Mm3")
@@ -297,6 +320,21 @@ dcmp_gas %>%
 dcmp_gas %>% autoplot()
 
 ```
+### STL features
+```{r}
+prod_tot %>% features(prod_pet, feat_stl)
+prod_tot %>% features(prod_gas, feat_stl)
+
+data_cuenca_time %>% features(prod_pet  , feat_stl)
+data_cuenca_time %>% features(prod_gas  , feat_stl)
+
+data_cuenca_time %>% 
+  features(prod_gas  , feat_stl) %>% 
+  ggplot(aes(x = trend_strength, y = seasonal_strength_year,
+             col = cuenca)) +
+  geom_point() 
+```
+
 ### Moving average
 ```{r}
 prod_tot %>%
@@ -328,9 +366,128 @@ prod_tot %>%
   components() %>%
   autoplot()
 ```
+
+
+
 # Prophet
 ```{r}
-library(prophet)
+# library(cowplot)
 
+for (span in c(0.25, 0.5, 0.75, 0.99)){
+  loess=stats::loess(prod_pet~as.numeric(fecha), data = prod_tot, na.action = 'na.exclude',
+                   model = T, span=span)
+  prod_tot['loess_prodpet'] =  predict(loess,prod_tot)
+  loess_1 = ggplot(prod_tot, aes(fecha,prod_pet)) + geom_point() + 
+    geom_line(aes(y=loess_prodpet), color='firebrick', size=1) +
+    labs(title= paste("LOESS span:", span)) + theme_bw() 
+  print(loess_1)
+  
+} 
+
+
+```
+```{r}
+
+#GAS
+prophet_df = prod_tot %>% select(fecha, prod_gas) %>% rename(., ds=fecha, y=prod_gas)
+
+#modelo
+prophet_model = prophet()
+prophet_model = fit.prophet(prophet_model, prophet_df)
+
+#visualizacion del modelo
+plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
+prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
+
+```
+## Prophet con estacionalidad
+```{r}
+prophet_season=prophet()
+prophet_season=add_seasonality(m=prophet_season, name='trim', period=3, fourier.order = 3)
+prophet_season = fit.prophet(m = prophet_season, prophet_df) 
+
+plot(prophet_season,fcst=predict(prophet_season, prophet_df)) +theme_bw()
+prophet_plot_components(prophet_season, fcst=predict(prophet_season, prophet_df))
+
+
+#forecasting
+#CRUDO
+#preprocesamiento dataset prophet
+prophet_df = prod_tot %>% select(fecha, prod_pet) %>% rename(., ds=fecha, y=prod_pet)
+prophet_df_train = prophet_df %>% filter(year(ds) <= 2018)
+prophet_df_test = prophet_df # %>% filter(year(ds) == 2019)
+
+#modelo
+prophet_model = prophet(seasonality.mode = 'multiplicative')
+prophet_model=add_seasonality(m=prophet_model, name='sem', period=6, fourier.order = 2)
+prophet_model = fit.prophet(prophet_model, prophet_df_train)
+future <- make_future_dataframe(prophet_model, periods = 6, freq = 'month')
+fcst <- predict(prophet_model, future)
+plot(prophet_model, fcst)
+
+ggplot()+
+  geom_point(data = fcst, aes(yearmonth(ds), yhat, color = "red"))+
+  geom_line(data = prophet_df , aes(ds,y))
+
+#visualizacion del modelo
+plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
+prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
+
+
+```
+### Predicción prophet
+```{r}
+cv_base = cross_validation(prophet_season, initial = 2, period = 4, horizon = 6, units = '365 days')
+# cv_base = cross_validation(prophet_season, initial = 12, period = 2, horizon = 3,  units = 'days')
+cv_base
+```
+```{r}
+cv_base
+```
+
+```{r}
+performance_metrics(cv_base, rolling_window = 0.25)
+
+```
+
+# Forecasting
+```{r}
+# library(forecast)
+library(fable)
+
+#gas
+fit_models <- prod_tot %>%
+  select(prod_gas) %>%
+  fabletools::model(
+    mean = MEAN(prod_gas),
+    naive = NAIVE(prod_gas),
+    drift = NAIVE(prod_gas ~drift()),
+    ets = ETS(prod_gas )
+
+    )
+
+fit_models
+
+fit_models %>% 
+  select(ets) %>% 
+  report()
+
+fit_models %>% 
+  fabletools::forecast(h = 12) %>% 
+  # filter(.model == "ets") %>%
+  autoplot(prod_tot %>% select(prod_gas), level = NULL) +
+  autolayer(
+    filter_index(prod_tot, "2018 Jan" ~ .),
+    colour = "red"
+  )+
+  theme(legend.position = "bottom") +
+  labs(
+    x = "",
+    y = "Producción de gas"
+  ) +
+   guides(colour = guide_legend(title = "Forecast"))
+```
+```{r}
+augment(fit_models)
 ```
 
