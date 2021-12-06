@@ -62,22 +62,33 @@ data <- data %>% dplyr::select(c(anio,mes,ind,prod_pet))
 ########### GP
 
 #predict and variance
-real_hasta <- 72
+real_hasta <- 96
 x <- seq(1,real_hasta,1)
 y <- data[data$ind<=real_hasta,]$prod_pet
 plot(x,y)#, ylim=c(-4*10^5,12*10^5))
 
-train_hasta <- 66
+train_hasta <- 84
 xgp <- seq(1,train_hasta,1)
 ygp <- data[data$ind<=train_hasta,]$prod_pet
 # ygp <- scale(ygp)[,1]
 gp <- gausspr(xgp, ygp, variance.model = TRUE)
 
-test_hasta <- 72
-xtest <- seq(1,test_hasta,0.05)
-lines(xtest, predict(gp, xtest))
+# for (i in c(1,0.5,0.1,0.05,0.01)) {
+#   test_hasta <- 96
+#   xtest <- seq(1,test_hasta,i)
+#   lines(xtest, predict(gp, xtest))
+#   
+# }
+
+
+test_hasta <- 96
+# xtest <- seq(1,test_hasta,1)
+# lines(xtest, predict(gp, xtest))
+xtest <- seq(1,test_hasta,0.5)
+lines(xtest, predict(gp, xtest), col="blue")
 
 abline(v=train_hasta, col="red")
+
 
 lines(xtest,
       predict(gp, xtest)+2*predict(gp,xtest, type="sdeviation"),
