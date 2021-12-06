@@ -38,7 +38,7 @@ agregacion <- function(x) {
 #datos originales
 data <- read_csv(paste0("data/resultados/",arch), 
                  locale = locale(encoding = "ISO-8859-1")) %>%
-  filter(anio %in% c(2013:2018)) %>%                     # filtro años para mayor velocidad
+  filter(anio %in% c(2013:2020)) %>%                     # filtro años para mayor velocidad
   mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
          n_dias = days_in_month(fecha),
          prod_pet = prod_pet/n_dias,
@@ -62,20 +62,22 @@ data <- data %>% dplyr::select(c(anio,mes,ind,prod_pet))
 ########### GP
 
 #predict and variance
-x <- data$ind
-y <- data$prod_pet
+real_hasta <- 72
+x <- seq(1,real_hasta,1)
+y <- data[data$ind<=real_hasta,]$prod_pet
 plot(x,y)#, ylim=c(-4*10^5,12*10^5))
 
-
-xgp <- seq(1,66,1)
-ygp <- data[data$ind<=66,]$prod_pet
+train_hasta <- 66
+xgp <- seq(1,train_hasta,1)
+ygp <- data[data$ind<=train_hasta,]$prod_pet
 # ygp <- scale(ygp)[,1]
 gp <- gausspr(xgp, ygp, variance.model = TRUE)
 
-xtest <- seq(1,72,1)
+test_hasta <- 72
+xtest <- seq(1,test_hasta,0.05)
 lines(xtest, predict(gp, xtest))
 
-abline(v=66, col="red")
+abline(v=train_hasta, col="red")
 
 lines(xtest,
       predict(gp, xtest)+2*predict(gp,xtest, type="sdeviation"),
