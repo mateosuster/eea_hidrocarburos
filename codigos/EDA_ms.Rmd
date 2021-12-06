@@ -21,7 +21,7 @@ library(fabletools)
 
 
 
-# agrupamientos
+# agrupamientos (para producción)
 group_cols_prod = c( "anio", "mes", 
                 "cuenca", "areayacimiento" , "areapermisoconcesion",
                 "clasificacion", "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
@@ -49,7 +49,6 @@ agregacion <- function(x) {
 
 # Datos
 ```{r}
-
 #datos originales
 data <- read_csv("../data/resultados/dataset_2013a2020.csv", 
     locale = locale(encoding = "ISO-8859-1")) %>%
@@ -65,6 +64,9 @@ data <- read_csv("../data/resultados/dataset_2013a2020.csv",
 
 # todos los datos agrupados por el vector de agrupamiento
 data_time = data %>%      #SOLO SIRVE PARA DATOS DE PRODUCCION
+  distinct(fecha, anio, mes,  cuenca, areapermisoconcesion,
+           clasificacion, tipo_de_recurso ,tipopozo, 
+           tipoextraccion, proyecto, .keep_all=T) %>% 
   as_tsibble(index = fecha, 
              key =  all_of(group_cols_prod))
 
@@ -593,7 +595,11 @@ prophet_plot_components(prophet_season, fcst=predict(prophet_season, prophet_df)
 
 #CRUDO
 #preprocesamiento dataset prophet
-prophet_df = prod_tot %>%select(fecha, prod_pet) %>% rename(., ds=fecha, y=prod_pet)
+prophet_df = prod_tot %>%select(fecha, prod_pet, 
+                                precio_interno_gas,
+                                inversion_explotacion,
+                                precio_interno_crudo) %>% 
+  rename(., ds=fecha, y=prod_pet)
 prophet_df_train = prophet_df %>% filter(year(ds) <= 2019)
 prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 
@@ -601,11 +607,22 @@ prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 # prophet_model = prophet( changepoint.prior.scale = 0.000001, 
 prophet_model = prophet( changepoint.prior.scale = 0.5, 
                          # changepoints = c('2014-01-01'),
-                         yearly.seasonality=F)#, seasonality.mode = 'multiplicative')
-prophet_model=add_seasonality(m=prophet_model, name='ANUAL', period=13, fourier.order = 1)
+                         yearly.seasonality=T)#, seasonality.mode = 'multiplicative')
+prophet_model = add_regressor(prophet_model,"precio_interno_crudo" )
+prophet_model = add_regressor(prophet_model,"precio_interno_gas" )
+prophet_model = add_regressor(prophet_model,"inversion_explotacion", 
+                              mode='multiplicative' )
+
+# prophet_model=add_seasonality(m=prophet_model, name='ANUAL', period=13, fourier.order = 1)
 prophet_model=add_seasonality(m=prophet_model, name='SEM', period=7, fourier.order = 2)
 prophet_model = fit.prophet(prophet_model, prophet_df_train)
+
 future <- make_future_dataframe(prophet_model, periods = 12, freq = 'month')
+future$precio_interno_crudo = prophet_df[year(prophet_df$ds)==2020,]$"precio_interno_crudo"
+future$precio_interno_gas = prophet_df[year(prophet_df$ds)==2020,]$"precio_interno_gas"
+future$inversion_explotacion =
+  prophet_df[year(prophet_df$ds)==2020,]$"inversion_explotacion"
+
 fcst <- predict(prophet_model, future)
 plot(prophet_model, fcst) + add_changepoints_to_plot(prophet_model)
 
@@ -619,6 +636,7 @@ prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
 
 #RMSE
 sum(((fcst %>% slice(c(85:nrow(.))))$yhat - prophet_df_test$y)^2)
+regressor_coefficients(prophet_model)
 ```
 ## CV prophet
 ```{r}
