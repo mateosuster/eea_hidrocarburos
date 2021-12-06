@@ -15,14 +15,19 @@ library(lubridate)
 library(tsibble)
 library(feasts)
 library(prophet)
+# library(forecast)
+library(fable)
+library(fabletools)
+
 
 
 # agrupamientos
 group_cols_prod = c( "anio", "mes", 
                 "cuenca", "areayacimiento" , "areapermisoconcesion",
                 "clasificacion", "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
-                "proyecto",
-                "concepto")
+                "proyecto"
+                # ,"concepto"
+                )
 
 # función de agregacion
 agregacion <- function(x) {
@@ -48,7 +53,7 @@ agregacion <- function(x) {
 #datos originales
 data <- read_csv("../data/resultados/dataset_2013a2020.csv", 
     locale = locale(encoding = "ISO-8859-1")) %>%
-  filter(anio %in% c(2016:2019)) %>%                     # filtro años para mayor velocidad
+  filter(anio %in% c(2013:2020)) %>%                     # filtro años para mayor velocidad
   mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
          n_dias = days_in_month(fecha),
          prod_pet = prod_pet/n_dias,
@@ -100,7 +105,7 @@ precios_tot = data %>%
   as_tsibble(index = fecha)
   
   
-# rm(data)
+rm(data)
 gc()
 
 # agregacion totales por mes
@@ -349,14 +354,26 @@ prod_tot %>%
 ```
 ## Smooth STL
 ```{r}
-prod_tot %>%
+#CRUDO
+stl_smooth = prod_tot %>%
   model(
-    STL(prod_pet ~ trend(window = 7) +
-                   season(window = "periodic"),
-    robust = TRUE)) %>%
-  components() %>%
+    STL(prod_pet ~ trend(window = 13) +
+                   season(window =6)
+                   # season(window = "periodic"),
+    ,robust = TRUE))%>%
+  components() 
+
+stl_smooth%>%
   autoplot()
 
+# stl_smooth %>% 
+#   # model(NAIVE(season_adjust)) %>%
+#   forecast() %>% 
+#   autoplot(stl_smooth)
+
+
+
+#GAS
 prod_tot %>%
   model(
     STL(prod_gas ~ trend(window = 12) +
@@ -367,6 +384,164 @@ prod_tot %>%
   autoplot()
 ```
 
+## Forecasting
+### Split train test
+```{r}
+prod_train = prod_tot %>% filter(year(fecha)<=2019)
+prod_test = prod_tot %>% filter(year(fecha)==2020)
+
+```
+
+### Modelos benchmark
+```{r}
+
+#CRUDO
+fit_models <- prod_train %>%
+  select(prod_pet) %>%
+  fabletools::model(
+    # stl = STL(prod_gas),
+    mean = MEAN(prod_pet),
+    naive = NAIVE(prod_pet),
+    season_naive = SNAIVE(prod_pet),
+    drift = NAIVE(prod_pet ~drift())
+    # ,ets = ETS(prod_pet )
+
+    )
+
+#forecast
+models_fc = fit_models %>% 
+  forecast(new_data = prod_test)
+
+models_fc %>% 
+  autoplot(prod_train, level = NULL)+
+  autolayer(prod_test, prod_pet, colour = "red") +
+  labs(y = "m3/dias",
+       title = "Producción de crudo",
+       subtitle = "Observado y predicho") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+fit_models %>% 
+  fabletools::forecast(h = 12) %>% 
+  # filter(.model == "ets") %>%
+  autoplot(prod_tot %>% select(prod_pet), level = NULL) +
+  theme(legend.position = "bottom") +
+  labs(
+    x = "",
+    y = "Producción de crudo"
+  ) +
+   guides(colour = guide_legend(title = "Forecast"))
+```
+
+
+```{r}
+#GAS
+fit_models <- prod_train %>%
+  select(prod_gas) %>%
+  fabletools::model(
+    # stl = STL(prod_gas),
+    mean = MEAN(prod_gas),
+    naive = NAIVE(prod_gas),
+    season_naive = SNAIVE(prod_gas),
+    drift = NAIVE(prod_gas ~drift())
+    ,ets = ETS(prod_gas )
+
+    )
+
+fit_models
+
+fit_models %>% 
+  select(ets) %>% 
+  report()
+
+#forecast
+models_fc = fit_models %>% 
+  forecast(new_data = prod_test)
+
+models_fc %>% 
+  autoplot(prod_train, level = NULL)+
+  autolayer(prod_test, prod_gas, colour = "red") +
+  labs(y = "Mm3/dias",
+       title = "Producción de gas",
+       subtitle = "Observado y predicho") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+fit_models %>% 
+  fabletools::forecast(h = 12) %>% 
+  # filter(.model == "ets") %>%
+  autoplot(prod_tot %>% select(prod_gas), level = NULL) +
+  theme(legend.position = "bottom") +
+  labs(
+    y = "Mm3/d",
+    title = "Producción de gas"
+  ) +
+   guides(colour = guide_legend(title = "Forecast"))
+
+```
+
+### STL
+```{r}
+fit_dcmp <- prod_train %>%
+  model(stlf = decomposition_model(
+    STL(prod_pet ~  trend(window =3)+ season(window=7)
+        ,robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+
+# fit_dcmp %>% 
+#   components() %>% 
+#   autoplot()
+
+prod_train %>%
+  model(
+    STL(prod_pet ~ trend(window = 93) +
+                   # season(window = "periodic"),
+                   season(window = 7),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+
+
+fit_dcmp_fc <- fit_dcmp %>%
+  forecast(new_data = prod_test) 
+
+fit_dcmp_fc%>%
+  autoplot(prod_tot)+
+  labs(y = "m3/d",
+       title = "Pronostico de producción de crudo")
+```
+
+### Errores de predicción
+```{r}
+accuracy(models_fc, prod_test)
+accuracy(fit_dcmp_fc, prod_test)
+
+```
+
+
+### Diagnóstico de residuos
+```{r}
+aug <- augment(fit_models)
+
+autoplot(aug, .innov)
+
+aug %>%
+  ggplot(aes(x = .innov)) +
+  geom_histogram() +
+  labs(title = "Histogram of residuals")+
+  facet_wrap(~.model)
+
+fit_models %>% 
+  select(mean) %>% 
+  gg_tsresiduals()
+```
+
+```{r}
+aug %>% 
+  ACF(.innov) %>% 
+  autoplot()
+```
 
 
 # Prophet
@@ -386,8 +561,9 @@ for (span in c(0.25, 0.5, 0.75, 0.99)){
 
 
 ```
-```{r}
 
+## Modelo base (sin estacionalidad)
+```{r}
 #GAS
 prophet_df = prod_tot %>% select(fecha, prod_gas) %>% rename(., ds=fecha, y=prod_gas)
 
@@ -400,48 +576,54 @@ plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
 prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
 
 ```
-## Prophet con estacionalidad
+
+## Con estacionalidad
 ```{r}
+# GAS
 prophet_season=prophet()
 prophet_season=add_seasonality(m=prophet_season, name='trim', period=3, fourier.order = 3)
 prophet_season = fit.prophet(m = prophet_season, prophet_df) 
 
 plot(prophet_season,fcst=predict(prophet_season, prophet_df)) +theme_bw()
 prophet_plot_components(prophet_season, fcst=predict(prophet_season, prophet_df))
+```
 
+## Forecasting
+```{r}
 
-#forecasting
 #CRUDO
 #preprocesamiento dataset prophet
-prophet_df = prod_tot %>% select(fecha, prod_pet) %>% rename(., ds=fecha, y=prod_pet)
-prophet_df_train = prophet_df %>% filter(year(ds) <= 2018)
-prophet_df_test = prophet_df # %>% filter(year(ds) == 2019)
+prophet_df = prod_tot %>%select(fecha, prod_pet) %>% rename(., ds=fecha, y=prod_pet)
+prophet_df_train = prophet_df %>% filter(year(ds) <= 2019)
+prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 
 #modelo
-prophet_model = prophet(seasonality.mode = 'multiplicative')
-prophet_model=add_seasonality(m=prophet_model, name='sem', period=6, fourier.order = 2)
+# prophet_model = prophet( changepoint.prior.scale = 0.000001, 
+prophet_model = prophet( changepoint.prior.scale = 0.5, 
+                         # changepoints = c('2014-01-01'),
+                         yearly.seasonality=F)#, seasonality.mode = 'multiplicative')
+prophet_model=add_seasonality(m=prophet_model, name='ANUAL', period=13, fourier.order = 1)
+prophet_model=add_seasonality(m=prophet_model, name='SEM', period=7, fourier.order = 2)
 prophet_model = fit.prophet(prophet_model, prophet_df_train)
-future <- make_future_dataframe(prophet_model, periods = 6, freq = 'month')
+future <- make_future_dataframe(prophet_model, periods = 12, freq = 'month')
 fcst <- predict(prophet_model, future)
-plot(prophet_model, fcst)
+plot(prophet_model, fcst) + add_changepoints_to_plot(prophet_model)
 
 ggplot()+
   geom_point(data = fcst, aes(yearmonth(ds), yhat, color = "red"))+
   geom_line(data = prophet_df , aes(ds,y))
 
 #visualizacion del modelo
-plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
+# plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
 prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
 
-
+#RMSE
+sum(((fcst %>% slice(c(85:nrow(.))))$yhat - prophet_df_test$y)^2)
 ```
-### Predicción prophet
+## CV prophet
 ```{r}
-cv_base = cross_validation(prophet_season, initial = 2, period = 4, horizon = 6, units = '365 days')
+cv_base = cross_validation(prophet_model, initial = 2, period = 4, horizon = 6, units = 'days')
 # cv_base = cross_validation(prophet_season, initial = 12, period = 2, horizon = 3,  units = 'days')
-cv_base
-```
-```{r}
 cv_base
 ```
 
@@ -450,44 +632,4 @@ performance_metrics(cv_base, rolling_window = 0.25)
 
 ```
 
-# Forecasting
-```{r}
-# library(forecast)
-library(fable)
-
-#gas
-fit_models <- prod_tot %>%
-  select(prod_gas) %>%
-  fabletools::model(
-    mean = MEAN(prod_gas),
-    naive = NAIVE(prod_gas),
-    drift = NAIVE(prod_gas ~drift()),
-    ets = ETS(prod_gas )
-
-    )
-
-fit_models
-
-fit_models %>% 
-  select(ets) %>% 
-  report()
-
-fit_models %>% 
-  fabletools::forecast(h = 12) %>% 
-  # filter(.model == "ets") %>%
-  autoplot(prod_tot %>% select(prod_gas), level = NULL) +
-  autolayer(
-    filter_index(prod_tot, "2018 Jan" ~ .),
-    colour = "red"
-  )+
-  theme(legend.position = "bottom") +
-  labs(
-    x = "",
-    y = "Producción de gas"
-  ) +
-   guides(colour = guide_legend(title = "Forecast"))
-```
-```{r}
-augment(fit_models)
-```
 
