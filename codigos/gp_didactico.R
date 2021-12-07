@@ -7,15 +7,17 @@ library(plgp)
 
 
 # inputs x
-n <- 100
-X <- matrix(seq(0, 10, length=n), ncol=1)
+n <- 200
+X <- matrix(seq(0, 20, length=n), ncol=1)
 
+v <- 1
+l <- 1
 
 D <- distance(X)
 # matriz covarianzas con exponencial distancia euclídea
 # el eps en la diag es para evitar malos condicionamientos
 eps <- sqrt(.Machine$double.eps) 
-Sigma <- exp(-D) + diag(eps, n) 
+Sigma <- exp(-D/(2*l^2)) + diag(eps, n) 
 
 # observar que la diag es todos 1's, porque es exp(0)
 diag(Sigma)
@@ -23,11 +25,11 @@ diag(Sigma)
 
 # armamos la normal multivariada
 library(mvtnorm)
-Y <- rmvnorm(n=1, sigma=Sigma) #1 obs por cada x
+Y <- rmvnorm(n=1, sigma=v^2*Sigma) #1 obs por cada x
 
 # los Y son random de la MVN
 # tiene sentido que en un 95% caigan a +/-2 de la media=0
-plot(X, Y, type="p", ylim=c(-3,3))
+plot(X, Y, type="p")#, ylim=c(-3,3))
 
 
 # correlaciones a distancia 1 y 4
@@ -45,6 +47,7 @@ matplot(X, t(Y), type="p", ylab="Y", ylim=c(-3,3))
 
 
 
+######## Posterior predicción sin ruido
 # toy example 1D
 # prior con mu=0
 n <- 8
@@ -138,6 +141,7 @@ points(X[,1], X[,2])
 
 persp(xx, xx, matrix(mup, ncol=40), theta=-30, phi=30, xlab="x1", 
       ylab="x2", zlab="y")
+
 
 
 
