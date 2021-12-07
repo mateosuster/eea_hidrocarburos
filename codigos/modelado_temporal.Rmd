@@ -124,6 +124,20 @@ prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
            vida_util_avg = mean(vida_util_avg, na.rm = T)) %>% 
   as_tsibble(index = fecha)
 
+#dataset para prophet
+prophet_df = prod_tot %>%
+  left_join(precios_tot %>% select(fecha, precio_interno_crudo ,precio_interno_gas),
+            by = "fecha") %>% 
+  left_join(inv_tot %>% select(anio, inversion_explotacion, inversion_exploracion),
+            by = "anio") %>% 
+  select(fecha, prod_pet, precio_interno_gas,
+         inversion_explotacion, precio_interno_crudo) %>%
+  ungroup() %>% 
+  mutate(precio_interno_crudo = lag(precio_interno_crudo, k=1)) %>% 
+  rename(., ds=fecha, y=prod_pet) %>% 
+  na.omit()
+  
+  
 ```
 
 # EDA
@@ -366,14 +380,7 @@ fit_dcmp_fc%>%
 anio_train_hasta = 2017
 anio_test = 2018
 
-#preprocesamiento dataset prophet
-prophet_df = prod_tot %>%select(fecha, prod_pet, 
-                                precio_interno_gas,
-                                inversion_explotacion,
-                                precio_interno_crudo) %>% 
-  mutate(precio_interno_crudo = lag(precio_interno_crudo)) %>% 
-  rename(., ds=fecha, y=prod_pet) %>% 
-  na.omit()
+# Split train test
 prophet_df_train = prophet_df %>% filter(year(ds) <= anio_train_hasta)
 prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 
@@ -427,4 +434,3 @@ accuracy(fit_dcmp_fc, prod_test)
 sum(((fcst %>% slice(c(85:nrow(.))))$yhat - prophet_df_test$y)^2)
 regressor_coefficients(prophet_model)
 ```
-
