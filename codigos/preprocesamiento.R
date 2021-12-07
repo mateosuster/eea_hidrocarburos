@@ -32,6 +32,7 @@ group_cols_inv = c("anio", "cuenca",
                    )
 
 name_dataset_export = "dataset_2013a2020.csv" # ir cambiando segun lo que se quiera probar
+name_dataset_produccion = "produccion_2013a2020_corregido.csv" # 
 
 #NOTA: ajustar el join a manopla
 
@@ -308,7 +309,11 @@ glimpse(join)
 #####################
 # Exportacion
 #####################
+#dataset join
 write.csv(join , paste0("data/resultados/", name_dataset_export),row.names = F)
+
+#dataset produccion
+write.csv(super_data , paste0("data/resultados/", name_dataset_produccion),row.names = F)
 
 
         

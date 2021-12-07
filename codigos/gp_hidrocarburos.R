@@ -24,12 +24,12 @@ agregacion <- function(x) {
               prod_gas = sum(prod_gas, na.rm = T),
               prod_agua = sum(prod_agua, na.rm = T),
               tef_avg = mean(tef_avg, na.rm = T),
-              vida_util_avg = mean(vida_util_avg, na.rm = T),
-              inversion_explotacion = sum(inversion_explotacion, na.rm = T),
-              inversion_exploracion = sum(inversion_exploracion, na.rm = T),
-              precio_interno_crudo = mean(precio_interno_crudo, na.rm = T),
-              precio_interno_gas = mean(precio_interno_gas, na.rm = T),
-              riesgo_pais = mean(riesgo_pais, na.rm = T)
+              vida_util_avg = mean(vida_util_avg, na.rm = T)#,
+              # inversion_explotacion = sum(inversion_explotacion, na.rm = T),
+              # inversion_exploracion = sum(inversion_exploracion, na.rm = T),
+              # precio_interno_crudo = mean(precio_interno_crudo, na.rm = T),
+              # precio_interno_gas = mean(precio_interno_gas, na.rm = T),
+              # riesgo_pais = mean(riesgo_pais, na.rm = T)
     )
 }
 

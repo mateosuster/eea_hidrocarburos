@@ -1,9 +1,9 @@
 ---
-title: "EDA - Visualizaciones"
+title: "Forecasting producción hidrocarburífera"
 output: html_notebook
 ---
 
-# Introducción
+# Librerías y funciones
 ```{r}
 rm(list=ls())
 gc()
@@ -44,7 +44,6 @@ agregacion <- function(x) {
            riesgo_pais = mean(riesgo_pais, na.rm = T)
             )
 }
-
 ```
 
 # Datos
@@ -114,10 +113,6 @@ gc()
 prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
   agregacion()
 
-
-
-
-
 ```
 
 # EDA
@@ -147,61 +142,8 @@ autoplot(data_cuenca_time, prod_gas)+
 
 
 ```
-### Con suavizado
-```{r}
-ggplot(prod_tot, aes(fecha, prod_pet)) + geom_point(color='forestgreen') + geom_smooth() + theme_bw() + labs(title='Producción de petróleo: Suavizado')
 
-ggplot(prod_tot, aes(fecha, prod_gas)) + geom_point(color='forestgreen') + geom_smooth() + theme_bw() + labs(title='Producción de gas: Suavizado')
-
-```
-
-
-## Inversión
-```{r}
-# TOTAL
-autoplot(inv_tot, inversion_explotacion)+
-  labs(title = "Inversión",
-       subtitle = "Argentina",
-       y = "MM USD")
-
-# CUENCA
-autoplot(inv_cuenca, inversion_explotacion)+
-  labs(title = "Inversión",
-       subtitle = "Argentina",
-       y = "MM USD")
-
-```
-## Precios
-```{r}
-# TOTAL
-autoplot(precios_tot, precio_interno_crudo)+
-  labs(title = "Precios crudo",
-       subtitle = "Argentina",
-       y = "USD/m3")
-
-autoplot(precios_tot, precio_interno_gas)+
-  labs(title = "Precios gas",
-       subtitle = "Argentina",
-       y = "USD/Mm3")
-
-
-
-# CUENCA
-autoplot(precios_cuenca, precio_interno_crudo)+
-  labs(title = "Precio crudo",
-       subtitle = "Argentina",
-       y = "USD/m3")
-
-autoplot(precios_cuenca, precio_interno_gas)+
-  labs(title = "Precio gas",
-       subtitle = "Argentina",
-       y = "USD/Mm3")
-
-```
-
-
-# Estacionalidad
-## Producción
+### Estacionalidad
 ```{r}
 #TOTAL
 prod_tot %>%
@@ -238,129 +180,8 @@ data_cuenca_time %>%
 
 ```
 
-## Precios
-```{r}
-#TOTAL
-prod_tot %>%
-  gg_season(precio_interno_crudo, labels = "both") +
-  labs(y = "USD/m3",
-       title = "Seasonal plot: oil price")
 
-prod_tot %>%
-  gg_season(precio_interno_gas, labels = "both") +
-  labs(y = "USD/Mm3",
-       title = "Seasonal plot: natural gas price")
-
-prod_tot %>% 
-  gg_subseries(precio_interno_crudo) +
-  labs(y = "USD/m3",
-       title = "Precio de crudo")
-
-prod_tot %>% 
-  gg_subseries(precio_interno_gas) +
-  labs(y = "USD/Mm3",
-       title = "Precio de gas")
-
-#CUENC
-data_cuenca_time %>%
-  gg_season(precio_interno_crudo, labels = "both") +
-  labs(y = "USD/m3",
-       title = "Seasonal plot: oil price")
-
-data_cuenca_time %>%
-  gg_season(precio_interno_gas, labels = "both") +
-  labs(y = "USD/Mm3",
-       title = "Seasonal plot: natural gas price")
-
-
-```
-
-# Lag plot
-```{r}
-prod_tot %>% 
-  # filter(year(fecha)==2017) %>% 
-  gg_lag(prod_pet, geom = "point")
-```
-# Autocorrelación
-```{r}
-prod_tot %>% ACF(prod_pet) %>%   autoplot()
-data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
-```
-
-
-# STL (Descomposición de la serie temporal)
-## Default
-
-"The grey bars to the left of each panel show the relative scales of the components. Each grey bar represents the same length but because the plots are on different scales, the bars vary in size"
-La gran barra gris del panel de estacionalidad muestra que la variación en dicha componente es más pequeña comparada con respecto a la variación de los datos. Si achicaramos la barra hasta el punto que se haga igual al panel de los datos originales, entonces todos tendrían la misma escala. 
-```{r}
-dcmp_crudo = prod_tot %>% 
-  model(stl = STL(prod_pet, robust = T)) %>% 
-  components()
-
-dcmp_crudo %>%
-  as_tsibble() %>%
-  autoplot(prod_pet, color="gray") +
-  geom_line(aes(y=trend, color = "Trend")) +
-  geom_line(aes(y=season_adjust, colour = "Season adjust")) +
-  labs(y = "m3/día", title = "Producción de crudo"  )+
-  scale_color_manual(values=c( "#D55E00", "#0072B2"))+
-  theme(legend.position = "bottom")
-
-dcmp_crudo %>% autoplot()
-
-```
-
-```{r}
-dcmp_gas = prod_tot %>% 
-  model(stl = STL(prod_gas)) %>% 
-  components()
-
-dcmp_gas %>%
-  as_tsibble() %>%
-  autoplot(prod_gas, colour="gray") +
-  geom_line(aes(y=trend), colour = "#D55E00") +
-  geom_line(aes(y=season_adjust), colour = "#0072B2") +
-  labs(
-    y = "Mm3/día",
-    title = "Producción de gas"
-  )
-
-dcmp_gas %>% autoplot()
-
-```
-### STL features
-```{r}
-prod_tot %>% features(prod_pet, feat_stl)
-prod_tot %>% features(prod_gas, feat_stl)
-
-data_cuenca_time %>% features(prod_pet  , feat_stl)
-data_cuenca_time %>% features(prod_gas  , feat_stl)
-
-data_cuenca_time %>% 
-  features(prod_gas  , feat_stl) %>% 
-  ggplot(aes(x = trend_strength, y = seasonal_strength_year,
-             col = cuenca)) +
-  geom_point() 
-```
-
-### Moving average
-```{r}
-prod_tot %>%
- mutate(
-    `5-MA` = slider::slide_dbl(prod_pet, mean,
-                .before = 2, .after = 2, .complete = TRUE) ) %>% 
-  autoplot(prod_pet) +
-  geom_line(aes(y = `5-MA`), colour = "#D55E00") +
-  labs(y = "m3/dia",
-       title = "Produccion crudo") +
-  guides(colour = guide_legend(title = "series"))
-```
-
-## Smooth STL
-
-El parámetro window de trend y season controlan que tan rapido dichos componentes cambian.Valores más pequeños permiten cambios más rápidos. 
-En la tendencia, reflejan cuantas observaciones consecutivas son utilizdas para calcularla; mientras que en la estacionalidad es el número consecutivo de períodos a ser usado para estimar cada componente estacional. Setear la ventana de tendencia igual a "periodic" es lo mismo que forzar a una estacionalidad períodica (identica para todos los años)
+# Descomposición de la serie temporal
 ```{r}
 window_t = 5
 window_s = 7
@@ -395,18 +216,15 @@ prod_tot %>%
   components() %>%
   autoplot()
 ```
-
-## Forecasting
-### Split train test
+# Forecasting
 ```{r}
 prod_train = prod_tot %>% filter(year(fecha)<=2019)
 prod_test = prod_tot %>% filter(year(fecha)==2020)
 
 ```
 
-### Modelos benchmark
+## Modelos Benchmark
 ```{r}
-
 #CRUDO
 fit_models <- prod_train %>%
   select(prod_pet) %>%
@@ -445,7 +263,6 @@ fit_models %>%
   ) +
    guides(colour = guide_legend(title = "Forecast"))
 ```
-
 
 ```{r}
 #GAS
@@ -490,10 +307,9 @@ fit_models %>%
     title = "Producción de gas"
   ) +
    guides(colour = guide_legend(title = "Forecast"))
-
 ```
 
-### STL
+## STL
 ```{r}
 window_t = 3
 window_s = 7
@@ -526,80 +342,13 @@ fit_dcmp_fc <- fit_dcmp %>%
 fit_dcmp_fc%>%
   autoplot(prod_tot)+
   labs(y = "m3/d",
-       title = "Pronostico de producción de crudo")
+       title = "Pronostico de producción de crudo",
+       subtitle = "STL")
 ```
 
 
 
-### Diagnóstico de residuos
-```{r}
-aug <- augment(fit_models)
-
-autoplot(aug, .innov)
-
-aug %>%
-  ggplot(aes(x = .innov)) +
-  geom_histogram() +
-  labs(title = "Histogram of residuals")+
-  facet_wrap(~.model)
-
-fit_models %>% 
-  select(mean) %>% 
-  gg_tsresiduals()
-```
-
-```{r}
-aug %>% 
-  ACF(.innov) %>% 
-  autoplot()
-```
-
-
-# Prophet
-```{r}
-# library(cowplot)
-
-for (span in c(0.25, 0.5, 0.75, 0.99)){
-  loess=stats::loess(prod_pet~as.numeric(fecha), data = prod_tot, na.action = 'na.exclude',
-                   model = T, span=span)
-  prod_tot['loess_prodpet'] =  predict(loess,prod_tot)
-  loess_1 = ggplot(prod_tot, aes(fecha,prod_pet)) + geom_point() + 
-    geom_line(aes(y=loess_prodpet), color='firebrick', size=1) +
-    labs(title= paste("LOESS span:", span)) + theme_bw() 
-  print(loess_1)
-  
-} 
-
-
-```
-
-## Modelo base (sin estacionalidad)
-```{r}
-#GAS
-prophet_df = prod_tot %>% select(fecha, prod_gas) %>% rename(., ds=fecha, y=prod_gas)
-
-#modelo
-prophet_model = prophet()
-prophet_model = fit.prophet(prophet_model, prophet_df)
-
-#visualizacion del modelo
-plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
-prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
-
-```
-
-## Con estacionalidad
-```{r}
-# GAS
-prophet_season=prophet()
-prophet_season=add_seasonality(m=prophet_season, name='trim', period=3, fourier.order = 3)
-prophet_season = fit.prophet(m = prophet_season, prophet_df) 
-
-plot(prophet_season,fcst=predict(prophet_season, prophet_df)) +theme_bw()
-prophet_plot_components(prophet_season, fcst=predict(prophet_season, prophet_df))
-```
-
-## Forecasting
+## Prophet
 ```{r}
 
 #CRUDO
@@ -650,15 +399,13 @@ prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
 
 
 ```
-## CV prophet
-```{r}
-cv_base = cross_validation(prophet_model, initial = 2, period = 4, horizon = 6, units = 'days')
-# cv_base = cross_validation(prophet_season, initial = 12, period = 2, horizon = 3,  units = 'days')
-cv_base
 
-# performance_metrics(cv_base, rolling_window = 0.25)
+## Procesos gausianos
+```{r}
 
 ```
+
+
 
 # Errores de predicción
 ```{r}
@@ -669,5 +416,4 @@ accuracy(fit_dcmp_fc, prod_test)
 sum(((fcst %>% slice(c(85:nrow(.))))$yhat - prophet_df_test$y)^2)
 regressor_coefficients(prophet_model)
 ```
-
 
