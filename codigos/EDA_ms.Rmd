@@ -127,23 +127,23 @@ prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
 autoplot(prod_tot, prod_pet)+
   labs(title = "Producción de petróleo crudo",
        subtitle = "Argentina",
-       y = "m3")
+       y = "m3/d")
 
 autoplot(prod_tot, prod_gas)+
   labs(title = "Producción de gas natural",
        subtitle = "Argentina",
-       y = "Mm3")
+       y = "Mm3/d")
 
 # CUENCA
 autoplot(data_cuenca_time, prod_pet)+
   labs(title = "Producción de petróleo crudo",
        subtitle = "Argentina",
-       y = "m3")+theme(legend.position = "bottom")
+       y = "m3/d")+theme(legend.position = "bottom")
 
 autoplot(data_cuenca_time, prod_gas)+
   labs(title = "Producción de gas natural",
        subtitle = "Argentina",
-       y = "Mm3")
+       y = "Mm3/d")
 
 
 ```
@@ -206,33 +206,33 @@ autoplot(precios_cuenca, precio_interno_gas)+
 #TOTAL
 prod_tot %>%
   gg_season(prod_pet, labels = "both") +
-  labs(y = "m3",
+  labs(y = "m3/d",
        title = "Seasonal plot: oil production")
 
 prod_tot %>%
   gg_season(prod_gas, labels = "both") +
-  labs(y = "Mm3",
+  labs(y = "Mm3/d",
        title = "Seasonal plot: natural gas production")
 
 prod_tot %>% 
   gg_subseries(prod_pet) +
-  labs(y = "m3",
+  labs(y = "m3/d",
        title = "Producción de crudo")
 
 prod_tot %>% 
   gg_subseries(prod_gas) +
-  labs(y = "Mm3",
+  labs(y = "Mm3/d",
        title = "Producción de gas")
 
 #CUENC
 data_cuenca_time %>%
   gg_season(prod_pet, labels = "both") +
-  labs(y = "m3",
+  labs(y = "m3/d",
        title = "Seasonal plot: oil production")
 
 data_cuenca_time %>%
   gg_season(prod_gas, labels = "both") +
-  labs(y = "Mm3",
+  labs(y = "Mm3/d",
        title = "Seasonal plot: natural gas production")
 
 
@@ -290,20 +290,22 @@ data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
 
 # STL (Descomposición de la serie temporal)
 ## Default
+
+"The grey bars to the left of each panel show the relative scales of the components. Each grey bar represents the same length but because the plots are on different scales, the bars vary in size"
+La gran barra gris del panel de estacionalidad muestra que la variación en dicha componente es más pequeña comparada con respecto a la variación de los datos. Si achicaramos la barra hasta el punto que se haga igual al panel de los datos originales, entonces todos tendrían la misma escala. 
 ```{r}
 dcmp_crudo = prod_tot %>% 
-  model(stl = STL(prod_pet)) %>% 
+  model(stl = STL(prod_pet, robust = T)) %>% 
   components()
 
 dcmp_crudo %>%
   as_tsibble() %>%
-  autoplot(prod_pet, colour="gray") +
-  geom_line(aes(y=trend), colour = "#D55E00") +
-  geom_line(aes(y=season_adjust), colour = "#0072B2") +
-  labs(
-    y = "m3/día",
-    title = "Producción de crudo"
-  )
+  autoplot(prod_pet, color="gray") +
+  geom_line(aes(y=trend, color = "Trend")) +
+  geom_line(aes(y=season_adjust, colour = "Season adjust")) +
+  labs(y = "m3/día", title = "Producción de crudo"  )+
+  scale_color_manual(values=c( "#D55E00", "#0072B2"))+
+  theme(legend.position = "bottom")
 
 dcmp_crudo %>% autoplot()
 
@@ -354,13 +356,21 @@ prod_tot %>%
        title = "Produccion crudo") +
   guides(colour = guide_legend(title = "series"))
 ```
+
 ## Smooth STL
+
+El parámetro window de trend y season controlan que tan rapido dichos componentes cambian.Valores más pequeños permiten cambios más rápidos. 
+En la tendencia, reflejan cuantas observaciones consecutivas son utilizdas para calcularla; mientras que en la estacionalidad es el número consecutivo de períodos a ser usado para estimar cada componente estacional. Setear la ventana de tendencia igual a "periodic" es lo mismo que forzar a una estacionalidad períodica (identica para todos los años)
 ```{r}
+window_t = 5
+window_s = 7
+
 #CRUDO
 stl_smooth = prod_tot %>%
   model(
-    STL(prod_pet ~ trend(window = 13) +
-                   season(window =6)
+    STL(prod_pet ~ 
+          trend(window = window_t) +
+                   season(window =window_s)
                    # season(window = "periodic"),
     ,robust = TRUE))%>%
   components() 
@@ -378,9 +388,9 @@ stl_smooth%>%
 #GAS
 prod_tot %>%
   model(
-    STL(prod_gas ~ trend(window = 12) +
+    STL(prod_gas ~ trend(window = window_t) +
                    # season(window = "periodic"),
-                   season(window = 13),
+                   season(window = window_s),
     robust = TRUE)) %>%
   components() %>%
   autoplot()
@@ -405,7 +415,8 @@ fit_models <- prod_train %>%
     mean = MEAN(prod_pet),
     naive = NAIVE(prod_pet),
     season_naive = SNAIVE(prod_pet),
-    drift = NAIVE(prod_pet ~drift())
+    # drift = NAIVE(prod_pet ~drift())
+    drift = RW(prod_pet ~drift())
     # ,ets = ETS(prod_pet )
 
     )
@@ -594,13 +605,18 @@ prophet_plot_components(prophet_season, fcst=predict(prophet_season, prophet_df)
 ```{r}
 
 #CRUDO
+anio_train_hasta = 2017
+anio_test = 2018
+
 #preprocesamiento dataset prophet
 prophet_df = prod_tot %>%select(fecha, prod_pet, 
                                 precio_interno_gas,
                                 inversion_explotacion,
                                 precio_interno_crudo) %>% 
-  rename(., ds=fecha, y=prod_pet)
-prophet_df_train = prophet_df %>% filter(year(ds) <= 2019)
+  mutate(precio_interno_crudo = lag(precio_interno_crudo)) %>% 
+  rename(., ds=fecha, y=prod_pet) %>% 
+  na.omit()
+prophet_df_train = prophet_df %>% filter(year(ds) <= anio_train_hasta)
 prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 
 #modelo
@@ -609,7 +625,7 @@ prophet_model = prophet( changepoint.prior.scale = 0.5,
                          # changepoints = c('2014-01-01'),
                          yearly.seasonality=T)#, seasonality.mode = 'multiplicative')
 prophet_model = add_regressor(prophet_model,"precio_interno_crudo" )
-prophet_model = add_regressor(prophet_model,"precio_interno_gas" )
+# prophet_model = add_regressor(prophet_model,"precio_interno_gas" )
 prophet_model = add_regressor(prophet_model,"inversion_explotacion", 
                               mode='multiplicative' )
 
@@ -618,17 +634,17 @@ prophet_model=add_seasonality(m=prophet_model, name='SEM', period=7, fourier.ord
 prophet_model = fit.prophet(prophet_model, prophet_df_train)
 
 future <- make_future_dataframe(prophet_model, periods = 12, freq = 'month')
-future$precio_interno_crudo = prophet_df[year(prophet_df$ds)==2020,]$"precio_interno_crudo"
-future$precio_interno_gas = prophet_df[year(prophet_df$ds)==2020,]$"precio_interno_gas"
+future$precio_interno_crudo =  prophet_df[year(prophet_df$ds)<=anio_test,]$"precio_interno_crudo"
+# future$precio_interno_gas = prophet_df[year(prophet_df$ds)==2020,]$"precio_interno_gas"
 future$inversion_explotacion =
-  prophet_df[year(prophet_df$ds)==2020,]$"inversion_explotacion"
+  prophet_df[year(prophet_df$ds)<=anio_test,]$"inversion_explotacion"
 
 fcst <- predict(prophet_model, future)
 plot(prophet_model, fcst) + add_changepoints_to_plot(prophet_model)
 
 ggplot()+
   geom_point(data = fcst, aes(yearmonth(ds), yhat, color = "red"))+
-  geom_line(data = prophet_df , aes(ds,y))
+  geom_line(data = prophet_df %>% filter(year(ds) <=anio_test) , aes(ds,y))
 
 #visualizacion del modelo
 # plot(prophet_model,fcst=predict(prophet_model, prophet_df)) +theme_bw()
