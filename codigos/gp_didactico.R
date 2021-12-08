@@ -2,21 +2,32 @@
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
 
+
+## librerías
 library(plgp)
+library(mvtnorm)
 
 
+##### pequeño ruido para evitar el mal condicionamiento de algunas matrices que deben ser invertidas
+eps <- sqrt(.Machine$double.eps) 
+
+
+
+####### Ejemplo sampleo GP prior
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
 
 # inputs x
 n <- 200
 X <- matrix(seq(0, 20, length=n), ncol=1)
 
 v <- 1
-l <- 1
+l <- 1/sqrt(2)
 
 D <- distance(X)
 # matriz covarianzas con exponencial distancia euclídea
 # el eps en la diag es para evitar malos condicionamientos
-eps <- sqrt(.Machine$double.eps) 
 Sigma <- exp(-D/(2*l^2)) + diag(eps, n) 
 
 # observar que la diag es todos 1's, porque es exp(0)
@@ -24,7 +35,6 @@ diag(Sigma)
 
 
 # armamos la normal multivariada
-library(mvtnorm)
 Y <- rmvnorm(n=1, sigma=v^2*Sigma) #1 obs por cada x
 
 # los Y son random de la MVN
@@ -48,6 +58,10 @@ matplot(X, t(Y), type="p", ylab="Y", ylim=c(-3,3))
 
 
 ######## Posterior predicción sin ruido
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
+
 # toy example 1D
 # prior con mu=0
 n <- 8
@@ -59,6 +73,7 @@ Sigma <- exp(-D) + diag(eps, ncol(D))
 
 # predict
 XX <- matrix(seq(-0.5, 2*pi + 0.5, length=100), ncol=1)
+# XX <- matrix(seq(0, 2*pi, length=n*2), ncol=1)
 DXX <- distance(XX)
 SXX <- exp(-DXX) + diag(eps, ncol(DXX))
 
@@ -75,8 +90,8 @@ YY <- rmvnorm(100, mup, Sigmap)
 
 matplot(XX, t(YY), type="l", col="gray", lty=1, xlab="x", ylab="y")
 lines(XX, mup, lwd=2)
-lines(XX, sin(XX), col="blue")
-# points(XX, sin(XX), pch=20, cex=2)
+# lines(XX, sin(XX), col="blue")
+# lines(XX, YY, col="blue", type = "p")
 points(X, y, pch=20, cex=2)
 
 q1 <- mup + qnorm(0.05, 0, sqrt(diag(Sigmap)))
@@ -90,6 +105,10 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 
 
 ###### Higher dimension
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
+
 nx <- 20
 x <- seq(0, 2, length=nx)
 X <- expand.grid(x, x)
@@ -147,6 +166,10 @@ persp(xx, xx, matrix(mup, ncol=40), theta=-30, phi=30, xlab="x1",
 
 
 #### Scale
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
+
 n <- 100
 X <- matrix(seq(0, 50, length=n), ncol=1)
 D <- distance(X)
@@ -161,7 +184,13 @@ matplot(X, t(Y), type="b")
 
 
 
+
+
 ## wrong scale prior
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
+
 n <- 8
 X <- matrix(seq(0, 2*pi, length=n), ncol=1)
 y <- 5*sin(X)
@@ -195,7 +224,11 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 
 
 
-#### Ruido
+#### Posterior predicción con Ruido
+#limpio la memoria
+rm( list=ls() )  #remove all objects
+gc()             #garbage collection
+
 nlg <- function(g, D, Y) 
 {
   n <- length(Y)
@@ -207,7 +240,9 @@ nlg <- function(g, D, Y)
   return(-ll)
 }
 
-X <- rbind(X, X)
+n <- 8
+X <- matrix(seq(0, 2*pi, length=n), ncol=1)
+# X <- rbind(X, X)
 n <- nrow(X)
 y <- 5*sin(X) + rnorm(n, sd=1)
 D <- distance(X)
@@ -221,6 +256,8 @@ Ki <- solve(K)
 tau2hat <- drop(t(y) %*% Ki %*% y / n)
 c(tau=sqrt(tau2hat), sigma=sqrt(tau2hat*g))
 
+XX <- matrix(seq(-0.5, 2*pi + 0.5, length=100), ncol=1)
+DXX <- distance(XX)
 DX <- distance(XX, X)
 KX <- exp(-DX)
 KXX <- exp(-DXX) + diag(g, nrow(DXX))
@@ -237,6 +274,6 @@ YY <- rmvnorm(100, mup, Sigma.int)
 matplot(XX, t(YY), type="l", lty=1, col="gray", xlab="x", ylab="y")
 points(X, y, pch=20, cex=2)
 lines(XX, mup, lwd=2)
-lines(XX, 5*sin(XX), col="blue")
+# lines(XX, 5*sin(XX), col="blue")
 lines(XX, q1, lwd=2, lty=2, col=2)
 lines(XX, q2, lwd=2, lty=2, col=2)
