@@ -14,7 +14,8 @@ library(kernlab)
 
 setwd("~/dataScience/maestriaDC/2021/EEA_2021cuat2/practica/tp_final/eea_hidrocarburos")
 
-arch <- "dataset_2013a2020.csv"
+# arch <- "dataset_2013a2020.csv"
+arch <- "produccion_2013a2020_corregido.csv"
 
 
 # función de agregacion
