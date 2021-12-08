@@ -1,3 +1,4 @@
+#limpio env y garbage collector
 rm(list=ls())
 gc()
 
@@ -53,7 +54,7 @@ data <- read_csv(paste0("data/resultados/",arch),
 
 data <- data %>% ungroup() %>% mutate(ind = row_number())
 
-data <- data %>% dplyr::select(c(anio,mes,ind,prod_pet,fecha))
+# data <- data %>% dplyr::select(c(anio,mes,ind,prod_pet,fecha))
 
 
 
