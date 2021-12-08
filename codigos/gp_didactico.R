@@ -17,13 +17,14 @@ eps <- sqrt(.Machine$double.eps)
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 # inputs x
 n <- 200
 X <- matrix(seq(0, 20, length=n), ncol=1)
 
 v <- 1
-l <- 1/sqrt(2)
+l <- 10
 
 D <- distance(X)
 # matriz covarianzas con exponencial distancia euclídea
@@ -31,7 +32,7 @@ D <- distance(X)
 Sigma <- exp(-D/(2*l^2)) + diag(eps, n) 
 
 # observar que la diag es todos 1's, porque es exp(0)
-diag(Sigma)
+# diag(Sigma)
 
 
 # armamos la normal multivariada
@@ -47,10 +48,9 @@ c(exp(-1^2), exp(-4^2))
 
 
 
-
 #ahora 3 obs por cada x
-Y <- rmvnorm(3, sigma=Sigma)
-matplot(X, t(Y), type="p", ylab="Y", ylim=c(-3,3))
+Y <- rmvnorm(10, sigma=Sigma)
+matplot(X, t(Y), type="p", ylab="Y")#, ylim=c(-3,3))
 
 
 
@@ -61,6 +61,7 @@ matplot(X, t(Y), type="p", ylab="Y", ylim=c(-3,3))
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 # toy example 1D
 # prior con mu=0
@@ -90,7 +91,7 @@ YY <- rmvnorm(100, mup, Sigmap)
 
 matplot(XX, t(YY), type="l", col="gray", lty=1, xlab="x", ylab="y")
 lines(XX, mup, lwd=2)
-# lines(XX, sin(XX), col="blue")
+lines(XX, sin(XX), col="blue")
 # lines(XX, YY, col="blue", type = "p")
 points(X, y, pch=20, cex=2)
 
@@ -108,6 +109,7 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 nx <- 20
 x <- seq(0, 2, length=nx)
@@ -169,6 +171,7 @@ persp(xx, xx, matrix(mup, ncol=40), theta=-30, phi=30, xlab="x1",
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 n <- 100
 X <- matrix(seq(0, 50, length=n), ncol=1)
@@ -190,6 +193,7 @@ matplot(X, t(Y), type="b")
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 n <- 8
 X <- matrix(seq(0, 2*pi, length=n), ncol=1)
@@ -228,6 +232,7 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
+eps <- sqrt(.Machine$double.eps) 
 
 nlg <- function(g, D, Y) 
 {
@@ -242,7 +247,7 @@ nlg <- function(g, D, Y)
 
 n <- 8
 X <- matrix(seq(0, 2*pi, length=n), ncol=1)
-# X <- rbind(X, X)
+X <- rbind(X, X)
 n <- nrow(X)
 y <- 5*sin(X) + rnorm(n, sd=1)
 D <- distance(X)
@@ -277,3 +282,4 @@ lines(XX, mup, lwd=2)
 # lines(XX, 5*sin(XX), col="blue")
 lines(XX, q1, lwd=2, lty=2, col=2)
 lines(XX, q2, lwd=2, lty=2, col=2)
+
