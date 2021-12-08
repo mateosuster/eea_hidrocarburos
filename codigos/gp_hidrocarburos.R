@@ -81,7 +81,7 @@ gp <- gausspr(x_train, y_train[,1], type = "regression", kernel = "rbfdot",
               variance.model = TRUE, scaled = TRUE, cross = 5)
 
 y <- scale(y, center=attr(y_train, 'scaled:center'), scale = attr(y_train, 'scaled:scale'))[,1]
-plot(x,y, ylim=c(-4,4), axes=FALSE, frame.plot=TRUE)
+plot(x,y, ylim=c(-4,4), axes=FALSE, frame.plot=TRUE, ylab="Prod. Crudo (ref. al promedio)")
 # plot(x,y, axes=FALSE, frame.plot=TRUE)
 axis(side=1, labels=x_label, at=x)
 axis(side=2,at=seq(-10,10,1))
