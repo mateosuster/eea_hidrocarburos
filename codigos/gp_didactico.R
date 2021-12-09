@@ -13,6 +13,9 @@ eps <- sqrt(.Machine$double.eps)
 
 
 
+#### Todos los ejemplos están basados en esto https://bookdown.org/rbg/surrogates/chap5.html
+
+
 
 ####### Ejemplo sampleo GP prior
 #limpio la memoria
