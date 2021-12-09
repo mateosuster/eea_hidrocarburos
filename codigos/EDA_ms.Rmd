@@ -129,7 +129,19 @@ prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
            tef_avg = mean(tef_avg, na.rm = T),
            vida_util_avg = mean(vida_util_avg, na.rm = T))
 
-
+#dataset para prophet
+prophet_df = prod_tot %>%
+  left_join(precios_tot %>% select(fecha, precio_interno_crudo ,precio_interno_gas),
+            by = "fecha") %>% 
+  left_join(inv_tot %>% select(anio, inversion_explotacion, inversion_exploracion),
+            by = "anio") %>% 
+  select(fecha, prod_pet, precio_interno_gas,
+         inversion_explotacion, precio_interno_crudo) %>%
+  ungroup() %>% 
+  mutate(precio_interno_crudo = lag(precio_interno_crudo, k=1)) %>% 
+  rename(., ds=fecha, y=prod_pet) %>% 
+  na.omit()
+  
 
 
 
@@ -306,8 +318,7 @@ data_cuenca_time %>% ACF(prod_pet) %>%   autoplot()
 # STL (Descomposición de la serie temporal)
 ## Default
 
-"The grey bars to the left of each panel show the relative scales of the components. Each grey bar represents the same length but because the plots are on different scales, the bars vary in size"
-La gran barra gris del panel de estacionalidad muestra que la variación en dicha componente es más pequeña comparada con respecto a la variación de los datos. Si achicaramos la barra hasta el punto que se haga igual al panel de los datos originales, entonces todos tendrían la misma escala. 
+La gran barra gris de los paneles indican la escala relativa de los componentes. Todas las barras presentan el mismo largo, pero se ven distintas por sus diferentes escalas. En la estacionalidad se muestra que la variación en dicha componente es más pequeña comparada con respecto a la variación de los datos. Si achicaramos la barra hasta el punto que se haga igual al panel de los datos originales, entonces todos tendrían la misma escala. 
 ```{r}
 dcmp_crudo = prod_tot %>% 
   model(stl = STL(prod_pet, robust = T)) %>% 

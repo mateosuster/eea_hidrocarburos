@@ -1,5 +1,5 @@
 ---
-title: "Forecasting producción hidrocarburífera"
+title: "Predicción de producción hidrocarburífera"
 output: html_notebook
 ---
 
@@ -12,16 +12,17 @@ library(readr)
 library(tidyverse)
 library(ggplot2)
 library(lubridate)
-library(tsibble)
-library(feasts)
-library(prophet)
-# library(forecast)
+
+library(tsibble) # formato series de tiempo
+library(feasts) #librerías para modelos benchmark y STL
 library(fable)
-library(fabletools)
+library(fabletools) #decomposition_model
+library(forecast) #predicciones
+library(prophet)
 
 
 
-# agrupamientos (para producción)
+# columnas de agrupamientos (para producción)
 group_cols_prod = c( "anio", "mes", 
                 "cuenca", "areayacimiento" , "areapermisoconcesion",
                 "clasificacion", "tipo_de_recurso" ,"tipopozo", "tipoextraccion",
@@ -44,6 +45,18 @@ agregacion <- function(x) {
            riesgo_pais = mean(riesgo_pais, na.rm = T)
             )
 }
+
+#funcion de producción por día
+prod_dia <- function(x){
+  x %>%   
+  mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
+         n_dias = days_in_month(fecha),
+         prod_pet = prod_pet/n_dias,
+         prod_gas = prod_gas/n_dias,
+         prod_agua = prod_agua/n_dias) %>%           # CONVERSION A UNIDADES DIARIAS
+  select(-n_dias)
+}
+
 ```
 
 # Datos
@@ -52,26 +65,16 @@ agregacion <- function(x) {
 data <- read_csv("../data/resultados/dataset_2013a2020.csv", 
     locale = locale(encoding = "ISO-8859-1")) %>%
   filter(anio %in% c(2013:2020)) %>%                     # filtro años para mayor velocidad
-  mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
-         n_dias = days_in_month(fecha),
-         prod_pet = prod_pet/n_dias,
-         prod_gas = prod_gas/n_dias,
-         prod_agua = prod_agua/n_dias) %>%           # CONVERSION A UNIDADES DIARIAS
-  select(-n_dias)
+  prod_dia()
   # group_by_at(group_cols_prod ) %>% 
   # agregacion()
 
-# todos los datos agrupados por el vector de agrupamiento
-#SOLO SIRVE PARA DATOS DE PRODUCCION
+
+#DATOS DE PRODUCCION
 data_time <-  read_csv("../data/resultados/produccion_2013a2020_corregido.csv",
                        locale = locale(encoding = "ISO-8859-1")) %>%
-  filter(anio %in% c(2013:2020)) %>%                   
-  mutate(fecha =  yearmonth(paste(anio, mes, sep="/")) ,
-         n_dias = days_in_month(fecha),
-         prod_pet = prod_pet/n_dias,
-         prod_gas = prod_gas/n_dias,
-         prod_agua = prod_agua/n_dias) %>%        
-  select(-n_dias)
+  filter(anio %in% c(2013:2020)) %>%
+  prod_dia()
 
 # agregados por cuenca
 data_cuenca_time = data %>% 
@@ -81,36 +84,7 @@ data_cuenca_time = data %>%
   as_tsibble(index = fecha, 
              key =  cuenca)
 
-# PARA INVERSION
-inv_cuenca = data %>% 
-  distinct(anio, concepto, cuenca, areapermisoconcesion, .keep_all = T ) %>% 
-  group_by(anio, cuenca) %>% 
-  agregacion() %>% 
-  as_tsibble(index = anio, 
-             key =  all_of(c("cuenca")))
-
-inv_tot = data %>%
-  distinct(anio, concepto,  areapermisoconcesion, .keep_all = T ) %>%
-  group_by(anio) %>%
-  agregacion() %>%
-  as_tsibble(index = anio)
-
-# PARA PRECIOS
-precios_cuenca = data %>% 
-  distinct(fecha, cuenca, .keep_all = T ) %>% 
-  group_by(fecha, cuenca) %>% 
-  agregacion() %>% 
-  as_tsibble(index = fecha, 
-             key =  all_of(c("cuenca")))
-
-precios_tot = data %>%
-  distinct(fecha, cuenca, .keep_all = T ) %>%
-  group_by(fecha) %>%
-  agregacion() %>%
-  as_tsibble(index = fecha)
-  
-  
-rm(data)
+rm(data) #limpiamos la memoria
 gc()
 
 
@@ -124,7 +98,19 @@ prod_tot = data_time %>%   #NO SIRVE PARA INVERSION ni PRECIOS
            vida_util_avg = mean(vida_util_avg, na.rm = T)) %>% 
   as_tsibble(index = fecha)
 
-#dataset para prophet
+#dataset para prophet}
+precios_tot = data %>%
+  distinct(fecha, cuenca, .keep_all = T ) %>%
+  group_by(fecha) %>%
+  agregacion() %>%
+  as_tsibble(index = fecha)
+
+inv_tot = data %>%
+  distinct(anio, concepto,  areapermisoconcesion, .keep_all = T ) %>%
+  group_by(anio) %>%
+  agregacion() %>%
+  as_tsibble(index = anio)
+
 prophet_df = prod_tot %>%
   left_join(precios_tot %>% select(fecha, precio_interno_crudo ,precio_interno_gas),
             by = "fecha") %>% 
@@ -137,6 +123,11 @@ prophet_df = prod_tot %>%
   rename(., ds=fecha, y=prod_pet) %>% 
   na.omit()
   
+
+
+head(prod_tot)
+head(data_time)
+head(data_cuenca_time)
   
 ```
 
@@ -174,12 +165,12 @@ autoplot(data_cuenca_time, prod_gas)+
 prod_tot %>%
   gg_season(prod_pet, labels = "both") +
   labs(y = "m3/d",
-       title = "Seasonal plot: oil production")
+       title = "Estacionalidad de producción de crudo")
 
 prod_tot %>%
   gg_season(prod_gas, labels = "both") +
   labs(y = "Mm3/d",
-       title = "Seasonal plot: natural gas production")
+       title = "Estacionalidad de producción de crudo gas natural")
 
 prod_tot %>% 
   gg_subseries(prod_pet) +
@@ -191,60 +182,56 @@ prod_tot %>%
   labs(y = "Mm3/d",
        title = "Producción de gas")
 
-#CUENC
-data_cuenca_time %>%
-  gg_season(prod_pet, labels = "both") +
-  labs(y = "m3/d",
-       title = "Seasonal plot: oil production")
-
-data_cuenca_time %>%
-  gg_season(prod_gas, labels = "both") +
-  labs(y = "Mm3/d",
-       title = "Seasonal plot: natural gas production")
 
 
 ```
 
 
-# Descomposición de la serie temporal
+# Descomposición de la serie temporal (STL)
 ```{r}
-window_t = 5
-window_s = 7
+window_t = 4
+window_s = 5
 
 #CRUDO
-stl_smooth = prod_tot %>%
-  model(
-    STL(prod_pet ~ 
-          trend(window = window_t) +
-                   season(window =window_s)
-                   # season(window = "periodic"),
-    ,robust = TRUE))%>%
-  components() 
-
-stl_smooth%>%
-  autoplot()
+for (window_t in c(15, 10,8,6,4)){
+  stl_smooth = prod_tot %>%
+    model(
+      STL(prod_pet ~ 
+            trend(window = window_t) +
+            season(window =window_s)
+          # season(window = "periodic") # estacionalidad constante a lo largo de los años
+      ,robust = TRUE))%>%
+    components() 
+  
+  print(stl_smooth%>%
+    autoplot() )
+}
 
 # stl_smooth %>% 
 #   # model(NAIVE(season_adjust)) %>%
 #   forecast() %>% 
 #   autoplot(stl_smooth)
+```
 
 
 
+```{r}
 #GAS
-prod_tot %>%
+for (window_s in c(17,13,8,5,3)){
+print(prod_tot %>%
   model(
     STL(prod_gas ~ trend(window = window_t) +
                    # season(window = "periodic"),
                    season(window = window_s),
     robust = TRUE)) %>%
   components() %>%
-  autoplot()
+  autoplot() )
+}
 ```
 # Forecasting
 ```{r}
-prod_train = prod_tot %>% filter(year(fecha)<=2019)
-prod_test = prod_tot %>% filter(year(fecha)==2020)
+prod_train = prod_tot %>% filter(year(fecha)<=2018)
+prod_test = prod_tot %>% filter(year(fecha)==2019)
 
 ```
 
@@ -252,16 +239,13 @@ prod_test = prod_tot %>% filter(year(fecha)==2020)
 ```{r}
 #CRUDO
 fit_models <- prod_train %>%
-  select(prod_pet) %>%
-  fabletools::model(
-    # stl = STL(prod_gas),
+  # select(prod_pet) %>%
+  model(
     mean = MEAN(prod_pet),
     naive = NAIVE(prod_pet),
     season_naive = SNAIVE(prod_pet),
-    # drift = NAIVE(prod_pet ~drift())
-    drift = RW(prod_pet ~drift())
-    # ,ets = ETS(prod_pet )
-
+    drift = NAIVE(prod_pet ~drift())
+    
     )
 
 #forecast
@@ -270,44 +254,30 @@ models_fc = fit_models %>%
 
 models_fc %>% 
   autoplot(prod_train, level = NULL)+
-  autolayer(prod_test, prod_pet, colour = "red") +
+  autolayer(prod_test, prod_pet, colour = "darkblue") +
   labs(y = "m3/dias",
        title = "Producción de crudo",
        subtitle = "Observado y predicho") +
   guides(colour = guide_legend(title = "Forecast"))
 
 
-fit_models %>% 
-  fabletools::forecast(h = 12) %>% 
-  # filter(.model == "ets") %>%
-  autoplot(prod_tot %>% select(prod_pet), level = NULL) +
-  theme(legend.position = "bottom") +
-  labs(
-    x = "",
-    y = "Producción de crudo"
-  ) +
-   guides(colour = guide_legend(title = "Forecast"))
+
 ```
 
 ```{r}
 #GAS
 fit_models <- prod_train %>%
   select(prod_gas) %>%
-  fabletools::model(
+  model(
     # stl = STL(prod_gas),
     mean = MEAN(prod_gas),
     naive = NAIVE(prod_gas),
     season_naive = SNAIVE(prod_gas),
     drift = NAIVE(prod_gas ~drift())
-    ,ets = ETS(prod_gas )
 
     )
 
 fit_models
-
-fit_models %>% 
-  select(ets) %>% 
-  report()
 
 #forecast
 models_fc = fit_models %>% 
@@ -315,28 +285,19 @@ models_fc = fit_models %>%
 
 models_fc %>% 
   autoplot(prod_train, level = NULL)+
-  autolayer(prod_test, prod_gas, colour = "red") +
+  autolayer(prod_test, prod_gas, colour = "darkblue") +
   labs(y = "Mm3/dias",
        title = "Producción de gas",
        subtitle = "Observado y predicho") +
   guides(colour = guide_legend(title = "Forecast"))
 
 
-fit_models %>% 
-  fabletools::forecast(h = 12) %>% 
-  # filter(.model == "ets") %>%
-  autoplot(prod_tot %>% select(prod_gas), level = NULL) +
-  theme(legend.position = "bottom") +
-  labs(
-    y = "Mm3/d",
-    title = "Producción de gas"
-  ) +
-   guides(colour = guide_legend(title = "Forecast"))
 ```
 
 ## STL
 ```{r}
-window_t = 3
+#modelo
+window_t = 15
 window_s = 7
 
 # CRUDO
@@ -347,20 +308,12 @@ fit_dcmp <- prod_train %>%
     NAIVE(season_adjust)
   ))
 
-# fit_dcmp %>% 
-#   components() %>% 
+# fit_dcmp %>%
+#   components() %>%
 #   autoplot()
 
-prod_train %>%
-  model(
-    STL(prod_pet ~ trend(window = window_t) +
-                   # season(window = "periodic"),
-                   season(window = window_s),
-    robust = TRUE)) %>%
-  components() %>%
-  autoplot()
 
-
+#predicción
 fit_dcmp_fc <- fit_dcmp %>%
   forecast(new_data = prod_test) 
 
@@ -370,6 +323,27 @@ fit_dcmp_fc%>%
        title = "Pronostico de producción de crudo",
        subtitle = "STL")
 ```
+```{r}
+# GAS
+
+fit_dcmp <- prod_train %>%
+  model(stlf = decomposition_model(
+    STL(prod_gas ~  trend(window =window_t)+ season(window=window_s)
+        ,robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+
+
+fit_dcmp_fc <- fit_dcmp %>%
+  forecast(new_data = prod_test) 
+
+fit_dcmp_fc%>%
+  autoplot(prod_tot)+
+  labs(y = "Mm3/d",
+       title = "Pronostico de producción de gas",
+       subtitle = "STL")
+
+```
 
 
 
@@ -377,8 +351,8 @@ fit_dcmp_fc%>%
 ```{r}
 
 #CRUDO
-anio_train_hasta = 2017
-anio_test = 2018
+anio_train_hasta = 2018
+anio_test = 2019
 
 # Split train test
 prophet_df_train = prophet_df %>% filter(year(ds) <= anio_train_hasta)
@@ -386,7 +360,7 @@ prophet_df_test = prophet_df # %>% filter(year(ds) == 2020)
 
 #modelo
 # prophet_model = prophet( changepoint.prior.scale = 0.000001, 
-prophet_model = prophet( changepoint.prior.scale = 0.5, 
+prophet_model = prophet( #changepoint.prior.scale = 0.5, 
                          # changepoints = c('2014-01-01'),
                          yearly.seasonality=T)#, seasonality.mode = 'multiplicative')
 prophet_model = add_regressor(prophet_model,"precio_interno_crudo" )
