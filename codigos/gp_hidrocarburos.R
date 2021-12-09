@@ -37,7 +37,7 @@ agregacion <- function(x) {
 
 
 
-#datos originales
+#levanto datos de producción
 data <- read_csv(paste0("data/resultados/",arch), 
                  locale = locale(encoding = "ISO-8859-1")) %>%
   filter(anio %in% c(2013:2020)) %>%                     # filtro años para mayor velocidad
@@ -58,67 +58,49 @@ data <- data %>% ungroup() %>% mutate(ind = row_number())
 
 
 
-#Escalo train, y uso ese escalado para el test.
-# datos_train = scale(datos_train_orig[,-c(1,2,3,11)])
-# datos_test = as.data.frame(scale(datos_test_orig[,-c(1,2,3,11)], center=attr(datos_train, 'scaled:center'), scale = attr(datos_train, 'scaled:scale')))
-
-
 ########### GP
 
-#predict and variance
+#datos reales: 96 es 2013 a 2020 inc.
 real_hasta <- 96
 x <- seq(1,real_hasta,1)
 x_label <- data[data$ind<=real_hasta,]$fecha
 y <- data[data$ind<=real_hasta,]$prod_pet
-# y <- scale(data[data$ind<=real_hasta,]$prod_pet)[,1]
 
 
+# entreno GP con datos train: 84 meses es 2013 a 2019 inc.
 train_hasta <- 84
 x_train <- seq(1,train_hasta,1)
-# y_train <- data[data$ind<=train_hasta,]$prod_pet
 y_train <- scale(y[1:train_hasta])
-# ygp <- scale(ygp)[,1]
 gp <- gausspr(x_train, y_train[,1], type = "regression", kernel = "rbfdot", 
               variance.model = TRUE, scaled = TRUE, cross = 5)
 
+# escaleo con parámetros de train
 y <- scale(y, center=attr(y_train, 'scaled:center'), scale = attr(y_train, 'scaled:scale'))[,1]
 plot(x,y, ylim=c(-4,4), axes=FALSE, frame.plot=TRUE, ylab="Prod. Crudo (ref. al promedio)")
-# plot(x,y, axes=FALSE, frame.plot=TRUE)
 axis(side=1, labels=x_label, at=x)
 axis(side=2,at=seq(-10,10,1))
 
 
-# for (i in c(1,0.5,0.1,0.05,0.01)) {
-#   test_hasta <- 96
-#   xtest <- seq(1,test_hasta,i)
-#   lines(xtest, predict(gp, xtest))
-#   
-# }
 
-
+# Posterior predict en datos test: 2013 a 2020 inc.
 test_hasta <- length(x)
-# xtest <- seq(1,test_hasta,1)
-# lines(xtest, predict(gp, xtest))
-# x_test <- seq(1,test_hasta,1)
 x_test <- seq(1,test_hasta,0.5)
 y_test <- predict(gp, x_test)
 lines(x_test, y_test, col="blue", type = "p")
 
+# línea vertical hasta donde entreno
 abline(v=train_hasta, col="red")
 
-# predict(gp,x_test, type="sdeviation")
-
+# banda a 1 desvío
 lines(x_test, predict(gp, x_test)+1*predict(gp,x_test, type="sdeviation"),col="blue")
 lines(x_test, predict(gp, x_test)-1*predict(gp,x_test, type="sdeviation"),col="blue")
 
+# banda a dos devíos
 lines(x_test, predict(gp, x_test)+2*predict(gp,x_test, type="sdeviation"),col="black")
 lines(x_test, predict(gp, x_test)-2*predict(gp,x_test, type="sdeviation"),col="black")
 
 grid()
 
-# lines(xtest,
-#       predict(modelo2, xtest)-2*predict(gp,xtest, type="sdeviation"),
-#       col="red")
 
 
 

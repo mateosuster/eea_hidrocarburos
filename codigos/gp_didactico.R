@@ -13,6 +13,7 @@ eps <- sqrt(.Machine$double.eps)
 
 
 
+
 ####### Ejemplo sampleo GP prior
 #limpio la memoria
 rm( list=ls() )  #remove all objects
@@ -57,6 +58,8 @@ matplot(X, t(Y), type="p", ylab="Y")#, ylim=c(-3,3))
 
 
 
+
+
 ######## Posterior predicción sin ruido
 #limpio la memoria
 rm( list=ls() )  #remove all objects
@@ -74,7 +77,6 @@ Sigma <- exp(-D) + diag(eps, ncol(D))
 
 # predict
 XX <- matrix(seq(-0.5, 2*pi + 0.5, length=100), ncol=1)
-# XX <- matrix(seq(0, 2*pi, length=n*2), ncol=1)
 DXX <- distance(XX)
 SXX <- exp(-DXX) + diag(eps, ncol(DXX))
 
@@ -105,7 +107,7 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 
 
 
-###### Higher dimension
+###### Higher dimension: ejemplo que no entró en los videos.
 #limpio la memoria
 rm( list=ls() )  #remove all objects
 gc()             #garbage collection
@@ -125,9 +127,6 @@ persp(x, x, matrix(Y[1,], ncol=nx), theta=-30, phi=30, xlab="x1",
       ylab="x2", zlab="y")
 persp(x, x, matrix(Y[2,], ncol=nx), theta=-30, phi=30, xlab="x1", 
       ylab="x2", zlab="y")
-
-
-
 
 
 library(lhs) 
@@ -167,24 +166,6 @@ persp(xx, xx, matrix(mup, ncol=40), theta=-30, phi=30, xlab="x1",
 
 
 
-#### Scale
-#limpio la memoria
-rm( list=ls() )  #remove all objects
-gc()             #garbage collection
-eps <- sqrt(.Machine$double.eps) 
-
-n <- 100
-X <- matrix(seq(0, 50, length=n), ncol=1)
-D <- distance(X)
-
-l <- 10
-C <- exp(-D/(2*l^2)) + diag(eps, n) 
-tau <- 5
-Y <- rmvnorm(3, sigma=tau^2*C)
-
-matplot(X, t(Y), type="b")
-
-
 
 
 
@@ -222,7 +203,6 @@ lines(XX, q2, lwd=2, lty=2, col=2)
 
 
 
-##### Parameters por MLE u otros métodos numéricos.
 
 
 
