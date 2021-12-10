@@ -135,7 +135,7 @@ head(data_cuenca_time)
 ## Producción
 ```{r}
 # TOTAL
-autoplot(prod_tot, prod_pet)+
+autoplot(prod_tot, prod_pet)+ #autoplot permite graficar series de tiempo
   labs(title = "Producción de petróleo crudo",
        subtitle = "Argentina",
        y = "m3/d")
@@ -197,10 +197,10 @@ for (window_t in c(15, 10,8,6,4)){
   stl_smooth = prod_tot %>%
     model(
       STL(prod_pet ~ 
-            trend(window = window_t) +
-            season(window =window_s)
+            trend(window = window_t) + #ventana de tendencia
+            season(window =window_s) #ventana de estacionalidad
           # season(window = "periodic") # estacionalidad constante a lo largo de los años
-      ,robust = TRUE))%>%
+      ,robust = TRUE))%>% #parámetro para controlar la robustez
     components() 
   
   print(stl_smooth%>%
@@ -230,8 +230,8 @@ print(prod_tot %>%
 ```
 # Forecasting
 ```{r}
-prod_train = prod_tot %>% filter(year(fecha)<=2018)
-prod_test = prod_tot %>% filter(year(fecha)==2019)
+prod_train = prod_tot %>% filter(year(fecha)<=2019)
+prod_test = prod_tot %>% filter(year(fecha)==2020)
 
 ```
 
@@ -302,6 +302,7 @@ window_s = 7
 
 # CRUDO
 fit_dcmp <- prod_train %>%
+  #hay que expresar la formulación de la descomoposición
   model(stlf = decomposition_model(
     STL(prod_pet ~  trend(window =window_t)+ season(window=window_s)
         ,robust = TRUE),
@@ -392,18 +393,16 @@ prophet_plot_components(prophet_model, fcst=predict(prophet_model, prophet_df))
 
 ```
 
-## Procesos gausianos
-```{r}
-
-```
-
 
 
 # Errores de predicción
 ```{r}
 accuracy(models_fc, prod_test)
 accuracy(fit_dcmp_fc, prod_test)
+```
 
+
+```{r}
 #RMSE
 sum(((fcst %>% slice(c(85:nrow(.))))$yhat - prophet_df_test$y)^2)
 regressor_coefficients(prophet_model)
